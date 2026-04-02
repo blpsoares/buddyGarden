@@ -135,7 +135,7 @@ export function readUserId(): string | null {
     const raw = readFileSync(join(homedir(), '.claude.json'), 'utf-8');
     const data = JSON.parse(raw) as Record<string, unknown>;
     // Try userId (lowercase d), then oauthAccount?.id
-    const userId = data['userId'] as string | undefined;
+    const userId = (data['userID'] ?? data['userId']) as string | undefined;
     if (userId) return userId;
     const oauth = data['oauthAccount'] as Record<string, unknown> | undefined;
     if (oauth?.['id']) return oauth['id'] as string;
