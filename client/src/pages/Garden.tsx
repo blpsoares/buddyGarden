@@ -527,6 +527,7 @@ export function Garden({ onNavigate }: Props) {
         <span style={{ ...pixelFont, fontSize: '8px', marginLeft: 12, color: '#999' }}>
           {data.level} · {data.xp.toLocaleString()} xp
         </span>
+        <button onClick={() => onNavigate('buddy')} style={iconBtn} title={tl('buddyModeBtn')}>🐾</button>
         <button onClick={() => onNavigate('stats')} style={iconBtn} title={tl('statsBtn')}>📊</button>
         <button onClick={() => onNavigate('chat')} style={iconBtn} title={tl('chatBtn')}>💬</button>
         <button

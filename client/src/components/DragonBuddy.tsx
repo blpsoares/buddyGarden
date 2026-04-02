@@ -1,89 +1,104 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLoadAtlas } from '../hooks/useLoadAtlas.ts';
 import { useSpriteAnimation } from '../hooks/useSpriteAnimation.ts';
 import type { AnimationType } from '../types/sprite.ts';
+
+export type DragonAnim = AnimationType | 'special';
 
 interface Props {
   size?: number;
   mood?: string;
   isMoving?: boolean;
+  /** Override: força uma animação específica */
+  forceAnim?: DragonAnim;
+  /** Chamado quando uma animação "once" (special) termina */
+  onAnimEnd?: () => void;
 }
 
-// Seleciona animação baseado no estado atual
 function selectAnimation(mood: string, isMoving: boolean): AnimationType {
   if (mood === 'tired') return 'sleep';
   if (isMoving) return 'walk';
   return 'idle';
 }
 
-// Renderiza um frame do atlas SEELE no canvas via ctx.drawImage
-// O atlas é "packed" (frames trimados com posições variáveis), então
-// usamos spriteSourceSize para restaurar o offset correto dentro do sourceSize
 function drawAtlasFrame(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
-  frameKey: ReturnType<typeof useSpriteAnimation>,
+  frameKey: NonNullable<ReturnType<typeof useSpriteAnimation>>,
   scale: number,
-  canvasW: number,
-  canvasH: number,
 ) {
-  if (!frameKey) return;
-
-  ctx.clearRect(0, 0, canvasW, canvasH);
-
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   const { frame, spriteSourceSize } = frameKey;
-
   ctx.drawImage(
     img,
-    frame.x, frame.y,           // posição do frame no atlas
-    frame.w, frame.h,            // tamanho do frame no atlas
-    spriteSourceSize.x * scale,  // posição destino (com offset de trim)
-    spriteSourceSize.y * scale,
-    frame.w * scale,             // tamanho destino escalado
-    frame.h * scale,
+    frame.x, frame.y, frame.w, frame.h,
+    spriteSourceSize.x * scale, spriteSourceSize.y * scale,
+    frame.w * scale, frame.h * scale,
   );
 }
 
-export function DragonBuddy({ size = 200, mood = 'happy', isMoving = false }: Props) {
+export function DragonBuddy({
+  size = 200,
+  mood = 'happy',
+  isMoving = false,
+  forceAnim,
+  onAnimEnd,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const onAnimEndRef = useRef(onAnimEnd);
+  useEffect(() => { onAnimEndRef.current = onAnimEnd; }, [onAnimEnd]);
 
-  const animation = selectAnimation(mood, isMoving);
+  const baseAnim = selectAnimation(mood, isMoving);
+  const animation: DragonAnim = forceAnim ?? baseAnim;
 
-  // Pré-carrega os 3 atlas — sem reload quando a animação muda
-  const idle  = useLoadAtlas('/sprites/dragon/idle.json');
-  const walk  = useLoadAtlas('/sprites/dragon/walk.json');
-  const sleep = useLoadAtlas('/sprites/dragon/sleep.json');
+  const idle    = useLoadAtlas('/sprites/dragon/idle.json');
+  const walk    = useLoadAtlas('/sprites/dragon/walk.json');
+  const sleep   = useLoadAtlas('/sprites/dragon/sleep.json');
+  const special = useLoadAtlas('/sprites/dragon/special.json');
 
-  const current = useMemo(() => {
-    if (animation === 'walk')  return walk;
-    if (animation === 'sleep') return sleep;
-    return idle;
-  }, [animation, idle, walk, sleep]);
+  const handleSpecialEnd = useCallback(() => {
+    onAnimEndRef.current?.();
+  }, []);
 
-  // FPS por animação: sleep é mais devagar
-  const fps = animation === 'sleep' ? 4 : animation === 'walk' ? 10 : 8;
-  const currentFrame = useSpriteAnimation(current.atlas, fps);
+  const { atlas: idleAtlas,    image: idleImg }    = idle;
+  const { atlas: walkAtlas,    image: walkImg }    = walk;
+  const { atlas: sleepAtlas,   image: sleepImg }   = sleep;
+  const { atlas: specialAtlas, image: specialImg } = special;
 
-  // sourceSize é sempre 512x512 nos sprites SEELE
+  // FPS por animação
+  const fps = animation === 'sleep' ? 4 : animation === 'walk' ? 10 : animation === 'special' ? 12 : 8;
+
+  const idleFrame    = useSpriteAnimation(animation === 'idle'    ? idleAtlas    : null, fps);
+  const walkFrame    = useSpriteAnimation(animation === 'walk'    ? walkAtlas    : null, fps);
+  const sleepFrame   = useSpriteAnimation(animation === 'sleep'   ? sleepAtlas   : null, fps);
+  const specialFrame = useSpriteAnimation(
+    animation === 'special' ? specialAtlas : null,
+    { fps, loop: false, onComplete: handleSpecialEnd },
+  );
+
+  const { image, frame: currentFrame } = useMemo(() => {
+    if (animation === 'walk'    && walkImg    && walkFrame)    return { image: walkImg,    frame: walkFrame };
+    if (animation === 'sleep'   && sleepImg   && sleepFrame)   return { image: sleepImg,   frame: sleepFrame };
+    if (animation === 'special' && specialImg && specialFrame) return { image: specialImg, frame: specialFrame };
+    if (idleImg && idleFrame)                                  return { image: idleImg,    frame: idleFrame };
+    return { image: null, frame: null };
+  }, [animation, walkImg, walkFrame, sleepImg, sleepFrame, specialImg, specialFrame, idleImg, idleFrame]);
+
   const sourceSize = currentFrame?.sourceSize.w ?? 512;
   const scale = size / sourceSize;
   const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !current.image || !currentFrame) return;
-
+    if (!canvas || !image || !currentFrame) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
-    // Aplica DPR: canvas físico é maior, scale corrige para CSS pixels
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    drawAtlasFrame(ctx, current.image, currentFrame, scale, size, size);
-  }, [current.image, currentFrame, scale, size, dpr]);
+    drawAtlasFrame(ctx, image, currentFrame, scale);
+  }, [image, currentFrame, scale, dpr]);
 
-  // Enquanto carrega, mostra placeholder transparente
-  const isReady = !!current.image && !!currentFrame;
+  const isReady = !!image && !!currentFrame;
 
   return (
     <canvas
@@ -96,7 +111,7 @@ export function DragonBuddy({ size = 200, mood = 'happy', isMoving = false }: Pr
         imageRendering: 'pixelated',
         display: 'block',
         opacity: isReady ? 1 : 0,
-        transition: 'opacity 0.2s',
+        transition: 'opacity 0.3s',
       }}
     />
   );

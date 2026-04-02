@@ -8,6 +8,8 @@ const T = {
     noBuddyChecking: 'verificando',
     statsBtn: 'stats',
     chatBtn: 'chat fullscreen',
+    buddyModeBtn: 'modo buddy',
+    chatFullscreen: 'chat fullscreen',
     petName: 'buddy',
     // Garden chat modal
     gardenChatTyping: 'digitando...',
@@ -98,6 +100,8 @@ const T = {
     noBuddyChecking: 'checking',
     statsBtn: 'stats',
     chatBtn: 'fullscreen chat',
+    buddyModeBtn: 'buddy mode',
+    chatFullscreen: 'fullscreen chat',
     petName: 'buddy',
     // Garden chat modal
     gardenChatTyping: 'typing...',

@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Garden } from './pages/Garden.tsx';
 import { Chat } from './pages/Chat.tsx';
 import { Stats } from './pages/Stats.tsx';
+import { BuddyMode } from './pages/BuddyMode.tsx';
 import { ChatProvider } from './context/ChatContext.tsx';
 
-export type Page = 'garden' | 'chat' | 'stats';
+export type Page = 'garden' | 'chat' | 'stats' | 'buddy';
 
 export default function App() {
   const [page, setPage] = useState<Page>('garden');
@@ -16,6 +17,9 @@ export default function App() {
         <button style={btnStyle(page === 'garden')} onClick={() => setPage('garden')}>
           🌱 Jardim
         </button>
+        <button style={btnStyle(page === 'buddy')} onClick={() => setPage('buddy')}>
+          🐾 Buddy
+        </button>
         <button style={btnStyle(page === 'chat')} onClick={() => setPage('chat')}>
           💬 Chat
         </button>
@@ -25,6 +29,7 @@ export default function App() {
       </nav>
       <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {page === 'garden' && <Garden onNavigate={setPage} />}
+        {page === 'buddy' && <BuddyMode onNavigate={setPage} />}
         {page === 'chat' && <Chat />}
         {page === 'stats' && <Stats />}
       </main>
