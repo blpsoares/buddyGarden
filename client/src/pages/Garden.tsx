@@ -307,6 +307,7 @@ export function Garden({ onNavigate }: Props) {
   const [pos, setPos] = useState({ x: 80, y: 580 });
   const [targetPos, setTargetPos] = useState({ x: 80, y: 580 });
   const [happy, setHappy] = useState(false);
+  const [jumping, setJumping] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [mood, setMood] = useState<Mood>('happy');
@@ -466,6 +467,8 @@ export function Garden({ onNavigate }: Props) {
       setTimeout(() => setHappy(false), 1500);
     }
     lastClickTime.current = now;
+    setJumping(true);
+    setTimeout(() => setJumping(false), 600);
     setChatOpen(o => {
       if (!o) setTimeout(() => inputRef.current?.focus(), 80);
       return !o;
@@ -495,6 +498,16 @@ export function Garden({ onNavigate }: Props) {
 
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+      <style>{`
+        @keyframes petJump {
+          0%   { transform: translateY(0) scale(1); }
+          30%  { transform: translateY(-80px) scale(1.1); }
+          55%  { transform: translateY(-100px) scale(1.08); }
+          75%  { transform: translateY(-40px) scale(1.04); }
+          90%  { transform: translateY(-12px) scale(1.01); }
+          100% { transform: translateY(0) scale(1); }
+        }
+      `}</style>
 
       {/* ── Fundo (sky) ── */}
       <div style={{ position: 'absolute', inset: 0, background: scene.sky }} />
@@ -595,6 +608,7 @@ export function Garden({ onNavigate }: Props) {
               cursor: 'pointer',
               transform: happy ? 'scale(1.25) rotate(-6deg)' : 'scale(1)',
               transition: 'transform 0.15s',
+              animation: jumping ? 'petJump 0.6s ease-out' : 'none',
             }}
           >
             {displayBones.species === 'dragon' ? (
@@ -614,7 +628,10 @@ export function Garden({ onNavigate }: Props) {
             {/* Modal header */}
             <div style={modalHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <BuddySprite bones={displayBones ?? bones} frame={frame} size={52} />
+                {displayBones?.species === 'dragon'
+                  ? <DragonBuddy size={52} mood={mood} isMoving={false} />
+                  : <BuddySprite bones={displayBones ?? bones} frame={frame} size={52} />
+                }
                 <div>
                   <span style={{ ...pixelFont, fontSize: '9px', color: '#ddd' }}>
                     {soul?.name ?? bones.species}
@@ -670,7 +687,10 @@ export function Garden({ onNavigate }: Props) {
                 >
                   {msg.role === 'assistant' && (
                     <div style={{ flexShrink: 0 }}>
-                      <BuddySprite bones={displayBones ?? bones} frame={0} size={40} />
+                      {displayBones?.species === 'dragon'
+                        ? <DragonBuddy size={40} mood={mood} isMoving={false} />
+                        : <BuddySprite bones={displayBones ?? bones} frame={0} size={40} />
+                      }
                     </div>
                   )}
                   <div style={{
@@ -717,7 +737,9 @@ export function Garden({ onNavigate }: Props) {
               </button>
             </form>
           </div>
-          <style>{`@keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }`}</style>
+          <style>{`
+            @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+          `}</style>
         </div>
       )}
     </div>
@@ -785,18 +807,19 @@ const iconBtn: React.CSSProperties = {
 // Modal
 const modalBackdrop: React.CSSProperties = {
   position: 'absolute', inset: 0, zIndex: 30,
-  display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-  background: 'rgba(5,5,20,0.55)',
-  backdropFilter: 'blur(7px)',
-  WebkitBackdropFilter: 'blur(7px)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: 'rgba(5,5,20,0.65)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
 };
 
 const modalPanel: React.CSSProperties = {
-  height: '65%',
-  background: 'rgba(8,8,26,0.96)',
-  borderTop: '2px solid rgba(80,80,180,0.45)',
+  width: 'min(540px, 92%)',
+  height: '78%',
+  background: 'rgba(8,8,26,0.97)',
+  border: '2px solid rgba(80,80,180,0.5)',
   display: 'flex', flexDirection: 'column',
-  boxShadow: '0 -8px 32px rgba(0,0,20,0.7)',
+  boxShadow: '0 8px 48px rgba(0,0,40,0.8), inset 0 0 0 1px rgba(120,120,255,0.07)',
 };
 
 const modalHeader: React.CSSProperties = {

@@ -69,7 +69,7 @@ function SpiderChart({ stats, size = 160 }: { stats: BuddyStats; size?: number }
   const outerPts = pts(1);
   const valuePts = Array.from({ length: N }, (_, i) => {
     const a = (2 * Math.PI * i / N) - Math.PI / 2;
-    const r = (values[i] / 100) * R;
+    const r = ((values[i] ?? 0) / 100) * R;
     return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
   });
 
@@ -296,7 +296,7 @@ export function Stats() {
                 {bones?.stats && STAT_META.map(m => (
                   <div key={m.key}>
                     <AnimatedBar
-                      value={(bones.stats as Record<string, number>)[m.key] ?? 0}
+                      value={bones.stats[m.key] ?? 0}
                       color={m.color}
                       label={m.label}
                       icon={m.icon}
