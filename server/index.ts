@@ -15,6 +15,7 @@ import {
   appendMessages,
   deleteConversation,
   renameConversation,
+  exportConversationToFile,
 } from './conversations.ts';
 
 const PORT = 7892;
@@ -183,6 +184,15 @@ Bun.serve({
       const now = Date.now();
       appendMessages(id, body.messages.map(m => ({ role: m.role, content: m.content, ts: now })));
       return json({ ok: true });
+    }
+
+    // Export conversation to a file for use with Claude CLI
+    const convExportMatch = url.pathname.match(/^\/api\/conversations\/([^/]+)\/export-to-claude$/);
+    if (convExportMatch && req.method === 'POST') {
+      const id = convExportMatch[1]!;
+      const result = exportConversationToFile(id);
+      if (!result) return json({ error: 'conversa não encontrada ou vazia' }, 404);
+      return json(result);
     }
 
     if (url.pathname === '/api/chat' && req.method === 'POST') {

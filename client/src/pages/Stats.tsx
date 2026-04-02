@@ -3,6 +3,7 @@ import { useBuddy } from '../hooks/useBuddy.ts';
 import { BuddySprite } from '../components/BuddySprite.tsx';
 import { DragonBuddy } from '../components/DragonBuddy.tsx';
 import { RarityBadge } from '../components/RarityBadge.tsx';
+import { useT } from '../hooks/useT.ts';
 import type { BuddyBones } from '../hooks/useBuddy.ts';
 
 interface SessionData {
@@ -188,6 +189,7 @@ function ActivityChart({ last7Days }: { last7Days: number[] }) {
 
 export function Stats() {
   const { data, loading } = useBuddy();
+  const tl = useT();
   const [sessions, setSessions] = useState<SessionData | null>(null);
   const [frame, setFrame] = useState(0);
 
@@ -211,13 +213,13 @@ export function Stats() {
 
   if (loading) return (
     <div style={centerStyle}>
-      <span style={mono(11)}>Carregando ficha...</span>
+      <span style={mono(11)}>{tl('statsLoadingBuddy')}</span>
     </div>
   );
 
   if (!data.bones && !data.soul) return (
     <div style={centerStyle}>
-      <span style={mono(11)}>Buddy ainda não nasceu...</span>
+      <span style={mono(11)}>{tl('statsNoBuddy')}</span>
     </div>
   );
 
@@ -271,8 +273,8 @@ export function Stats() {
             </div>
 
             <div style={{ borderTop: '1px solid #1e1e3a', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <Row label="espécie" value={bones?.species ?? '—'} />
-              <Row label="raridade" value={bones?.rarity ?? '—'} />
+              <Row label={tl('statsSpecies')} value={bones?.species ?? '—'} />
+              <Row label={tl('statsRarity')} value={bones?.rarity ?? '—'} />
               <Row label="chapéu" value={HAT_LABELS[bones?.hat ?? 'none'] ?? '—'} />
             </div>
 
@@ -342,9 +344,9 @@ export function Stats() {
               <div style={{ fontFamily: 'sans-serif', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>atividade</div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
-                <StatChip value={sessions.today}  label="hoje"   color="#4caf50" />
-                <StatChip value={sessions.total}  label="total"  color="#2196f3" />
-                <StatChip value={sessions.streak} label="streak" color="#ff9800" unit="d" />
+                <StatChip value={sessions.today}  label={tl('statsSessionsToday')}   color="#4caf50" />
+                <StatChip value={sessions.total}  label={tl('statsSessionsTotal')}  color="#2196f3" />
+                <StatChip value={sessions.streak} label={tl('statsStreak')} color="#ff9800" unit={tl('statsDays')} />
               </div>
 
               <ActivityChart last7Days={sessions.last7Days} />

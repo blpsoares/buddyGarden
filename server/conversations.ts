@@ -90,3 +90,30 @@ export function renameConversation(id: string, title: string) {
   const meta = index.find(m => m.id === id);
   if (meta) { meta.title = title; writeIndex(index); }
 }
+
+export function exportConversationToFile(id: string): { path: string; command: string } | null {
+  const messages = getConversation(id);
+  if (messages.length === 0) return null;
+
+  const exportsDir = join(GARDEN_DIR, 'exports');
+  if (!existsSync(exportsDir)) mkdirSync(exportsDir, { recursive: true });
+
+  const lines: string[] = [
+    'System: You are continuing a previous conversation.',
+    '',
+  ];
+
+  for (const msg of messages) {
+    const role = msg.role === 'user' ? 'User' : 'Assistant';
+    lines.push(`${role}: ${msg.content}`);
+    lines.push('');
+  }
+
+  lines.push('User: Continue from where we left off.');
+
+  const filePath = join(exportsDir, `${id}.txt`);
+  writeFileSync(filePath, lines.join('\n'));
+
+  const command = `claude --print --model claude-haiku-4-5 < ~/.buddy-garden/exports/${id}.txt`;
+  return { path: filePath, command };
+}
