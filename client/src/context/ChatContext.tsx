@@ -45,6 +45,8 @@ interface ChatContextValue {
   setApiKeyMissing: (v: boolean) => void;
   clear: () => void;
   provider: string;
+  claudeModel: string;
+  setClaudeModel: (m: string) => void;
   approveCommand: (msgIdx: number, alwaysAllow: boolean) => Promise<void>;
   denyCommand: (msgIdx: number) => void;
   sendCommandResult: (command: string, output: string, exitCode: number | null) => Promise<void>;
@@ -71,6 +73,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [apiKeyMissing, setApiKeyMissing] = useState(false);
   const [provider, setProvider] = useState('claude-cli');
+  const [claudeModel, setClaudeModelState] = useState('claude-haiku-4-5');
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [conversations, setConversations] = useState<ConversationMeta[]>([]);
@@ -93,12 +96,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetch('/api/config')
-      .then(r => r.json() as Promise<{ provider: string; lang?: 'pt' | 'en' }>)
+      .then(r => r.json() as Promise<{ provider: string; lang?: 'pt' | 'en'; claudeModel?: string }>)
       .then(d => {
         setProvider(d.provider);
         if (d.lang) setLangState(d.lang);
+        if (d.claudeModel) setClaudeModelState(d.claudeModel);
       })
       .catch(() => {});
+  }, []);
+
+  const setClaudeModel = useCallback((m: string) => {
+    setClaudeModelState(m);
   }, []);
 
   const setLang = useCallback((l: 'pt' | 'en') => {
@@ -429,7 +437,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   return (
     <ChatContext.Provider value={{
       messages, send, isStreaming, apiKeyMissing, setApiKeyMissing,
-      clear, provider, approveCommand, denyCommand, sendCommandResult,
+      clear, provider, claudeModel, setClaudeModel, approveCommand, denyCommand, sendCommandResult,
       conversationId, isAnonymous, conversations,
       loadConversation, newConversation, removeConversation,
       setIsAnonymous, refreshConversations,
