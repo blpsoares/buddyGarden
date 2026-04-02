@@ -35,17 +35,17 @@ export default function App() {
 
 const navStyle: React.CSSProperties = {
   display: 'flex',
-  gap: '2px',
+  gap: '4px',
   background: '#0d0d1a',
   borderBottom: '2px solid #333',
-  padding: '4px',
+  padding: '6px 8px',
 };
 
 function btnStyle(active: boolean): React.CSSProperties {
   return {
     fontFamily: '"Press Start 2P", monospace',
-    fontSize: '8px',
-    padding: '6px 10px',
+    fontSize: '11px',
+    padding: '9px 16px',
     background: active ? '#4a4a8a' : '#1a1a3a',
     color: active ? '#fff' : '#aaa',
     border: '2px solid',
