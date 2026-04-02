@@ -2,12 +2,20 @@ import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
-const BUDDY_LAND_DIR = join(homedir(), '.buddy-land');
+const BUDDY_LAND_DIR = join(homedir(), '.buddy-garden');
 const CONFIG_PATH = join(BUDDY_LAND_DIR, 'config.json');
 import { generateBones, readSoul, readUserId, detectSpeciesFromPersonality } from './buddy.ts';
 import { readChatConfig } from './chat.ts';
 import { computeSessionStats } from './sessions.ts';
 import { streamChat } from './chat.ts';
+import {
+  listConversations,
+  getConversation,
+  createConversation,
+  appendMessages,
+  deleteConversation,
+  renameConversation,
+} from './conversations.ts';
 
 const PORT = 7892;
 const CLIENT_DIST = join(import.meta.dir, '..', 'client', 'dist');
@@ -136,21 +144,75 @@ Bun.serve({
       });
     }
 
+    // ── Conversations ───────────────────────────────────────────────────────────
+    if (url.pathname === '/api/conversations' && req.method === 'GET') {
+      return json(listConversations());
+    }
+
+    if (url.pathname === '/api/conversations' && req.method === 'POST') {
+      type CreateBody = { firstMessage: string };
+      const body = (await req.json()) as CreateBody;
+      if (!body.firstMessage?.trim()) return json({ error: 'firstMessage obrigatório' }, 400);
+      return json(createConversation(body.firstMessage.trim()));
+    }
+
+    const convMatch = url.pathname.match(/^\/api\/conversations\/([^/]+)$/);
+    if (convMatch) {
+      const id = convMatch[1]!;
+      if (req.method === 'GET') {
+        return json(getConversation(id));
+      }
+      if (req.method === 'DELETE') {
+        deleteConversation(id);
+        return json({ ok: true });
+      }
+      if (req.method === 'PATCH') {
+        const body = (await req.json()) as { title?: string };
+        if (body.title) renameConversation(id, body.title.trim());
+        return json({ ok: true });
+      }
+    }
+
+    // Bulk-append messages to a conversation (used by garden balloon save)
+    const convMsgMatch = url.pathname.match(/^\/api\/conversations\/([^/]+)\/messages$/);
+    if (convMsgMatch && req.method === 'POST') {
+      const id = convMsgMatch[1]!;
+      type MsgsBody = { messages: Array<{ role: 'user' | 'assistant'; content: string }> };
+      const body = (await req.json()) as MsgsBody;
+      if (!Array.isArray(body.messages)) return json({ error: 'messages must be array' }, 400);
+      const now = Date.now();
+      appendMessages(id, body.messages.map(m => ({ role: m.role, content: m.content, ts: now })));
+      return json({ ok: true });
+    }
+
     if (url.pathname === '/api/chat' && req.method === 'POST') {
-      type ChatBody = { message: string; history?: Array<{ role: 'user' | 'assistant'; content: string }> };
+      type ChatBody = { message: string; history?: Array<{ role: 'user' | 'assistant'; content: string }>; conversationId?: string; lang?: 'pt' | 'en' };
       const body = (await req.json()) as ChatBody;
-      const { message, history = [] } = body;
+      const { message, history = [], conversationId } = body;
 
       const userId = readUserId();
       const soul = readSoul();
       const bones = userId ? generateBones(userId) : generateBones('anonymous');
       const stats = computeSessionStats();
 
+      // Resolve lang: body override > config file > default 'pt'
+      const configLang = (() => {
+        try {
+          if (existsSync(CONFIG_PATH)) {
+            const cfg = JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>;
+            return (cfg['lang'] as 'pt' | 'en' | undefined) ?? 'pt';
+          }
+        } catch { /* ignore */ }
+        return 'pt';
+      })();
+      const chatLang: 'pt' | 'en' = body.lang ?? configLang;
+
       const encoder = new TextEncoder();
 
       const stream = new ReadableStream({
         start(controller) {
           let closed = false;
+          let assistantText = '';
           const safeClose = () => {
             if (!closed) {
               closed = true;
@@ -163,14 +225,25 @@ Bun.serve({
             }
           };
 
+          const now = Date.now();
           streamChat(
             message, history, soul, bones, stats,
-            (text) => safeEnqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)),
-            () => { safeEnqueue(encoder.encode('data: [DONE]\n\n')); safeClose(); },
+            (text) => { assistantText += text; safeEnqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)); },
+            () => {
+              if (conversationId && assistantText.trim()) {
+                appendMessages(conversationId, [
+                  { role: 'user', content: message, ts: now },
+                  { role: 'assistant', content: assistantText, ts: Date.now() },
+                ]);
+              }
+              safeEnqueue(encoder.encode('data: [DONE]\n\n'));
+              safeClose();
+            },
             (err) => {
               safeEnqueue(encoder.encode(`data: ${JSON.stringify({ error: err })}\n\n`));
               safeClose();
             },
+            chatLang,
           ).catch((e: unknown) => {
             console.error('Chat error:', e);
             safeClose();
@@ -190,25 +263,124 @@ Bun.serve({
 
     if (url.pathname === '/api/config' && req.method === 'GET') {
       const config = readChatConfig();
-      return json({ provider: config.provider, hasApiKey: !!config.apiKey });
+      const configLang = (() => {
+        try {
+          if (existsSync(CONFIG_PATH)) {
+            const cfg = JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>;
+            return (cfg['lang'] as 'pt' | 'en' | undefined) ?? 'pt';
+          }
+        } catch { /* ignore */ }
+        return 'pt';
+      })();
+      return json({ provider: config.provider, hasApiKey: !!config.apiKey, claudeModel: config.claudeModel ?? 'claude-haiku-4-5', lang: configLang });
     }
 
     if (url.pathname === '/api/config' && req.method === 'POST') {
-      type ConfigBody = { provider: string; apiKey?: string };
+      type ConfigBody = { provider?: string; apiKey?: string; claudeModel?: string; lang?: 'pt' | 'en' };
       const body = (await req.json()) as ConfigBody;
-      const validProviders = ['claude-cli', 'anthropic', 'gemini'];
-      if (!validProviders.includes(body.provider)) {
-        return json({ error: 'Provider inválido' }, 400);
-      }
-      if (body.provider !== 'claude-cli' && (!body.apiKey || body.apiKey.length < 10)) {
-        return json({ error: 'API key necessária para este provider' }, 400);
-      }
       if (!existsSync(BUDDY_LAND_DIR)) mkdirSync(BUDDY_LAND_DIR, { recursive: true });
       const existing = existsSync(CONFIG_PATH)
         ? JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>
         : {};
-      writeFileSync(CONFIG_PATH, JSON.stringify({ ...existing, provider: body.provider, apiKey: body.apiKey ?? existing['apiKey'] }, null, 2));
+
+      // Permite patch parcial (só lang, por exemplo)
+      if (body.provider !== undefined) {
+        const validProviders = ['claude-cli', 'anthropic', 'gemini'];
+        if (!validProviders.includes(body.provider)) {
+          return json({ error: 'Provider inválido' }, 400);
+        }
+        if (body.provider !== 'claude-cli' && (!body.apiKey || body.apiKey.length < 10)) {
+          return json({ error: 'API key necessária para este provider' }, 400);
+        }
+      }
+
+      const updated: Record<string, unknown> = { ...existing };
+      if (body.provider !== undefined) updated['provider'] = body.provider;
+      if (body.apiKey !== undefined) updated['apiKey'] = body.apiKey;
+      if (body.claudeModel !== undefined) updated['claudeModel'] = body.claudeModel;
+      if (body.lang !== undefined) updated['lang'] = body.lang;
+      if (!updated['claudeModel']) updated['claudeModel'] = 'claude-haiku-4-5';
+
+      writeFileSync(CONFIG_PATH, JSON.stringify(updated, null, 2));
       return json({ ok: true });
+    }
+
+    // Adiciona comando à lista de sempre-permitidos
+    if (url.pathname === '/api/config/always-allow' && req.method === 'POST') {
+      type AllowBody = { command: string };
+      const body = (await req.json()) as AllowBody;
+      if (!body.command?.trim()) return json({ error: 'command obrigatório' }, 400);
+      if (!existsSync(BUDDY_LAND_DIR)) mkdirSync(BUDDY_LAND_DIR, { recursive: true });
+      const existing = existsSync(CONFIG_PATH)
+        ? JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>
+        : {};
+      const alwaysAllowed = Array.isArray(existing['alwaysAllowed'])
+        ? (existing['alwaysAllowed'] as string[])
+        : [];
+      if (!alwaysAllowed.includes(body.command.trim())) {
+        alwaysAllowed.push(body.command.trim());
+      }
+      writeFileSync(CONFIG_PATH, JSON.stringify({ ...existing, alwaysAllowed }, null, 2));
+      return json({ ok: true });
+    }
+
+    // Executa um comando shell (requer aprovação prévia no cliente)
+    if (url.pathname === '/api/exec' && req.method === 'POST') {
+      type ExecBody = { command: string };
+      const body = (await req.json()) as ExecBody;
+      if (!body.command?.trim()) return json({ error: 'command obrigatório' }, 400);
+
+      const command = body.command.trim();
+      const encoder = new TextEncoder();
+
+      const stream = new ReadableStream({
+        start(controller) {
+          let closed = false;
+          const safeClose = () => {
+            if (!closed) { closed = true; try { controller.close(); } catch { /* ok */ } }
+          };
+          const enq = (data: string) => {
+            if (!closed) { try { controller.enqueue(encoder.encode(data)); } catch { closed = true; } }
+          };
+
+          const proc = Bun.spawn(['bash', '-c', command], {
+            stdout: 'pipe',
+            stderr: 'pipe',
+            stdin: 'inherit',
+          });
+
+          const decoder = new TextDecoder();
+
+          // Stream stdout
+          void (async () => {
+            for await (const chunk of proc.stdout) {
+              enq(`data: ${JSON.stringify({ text: decoder.decode(chunk, { stream: true }) })}\n\n`);
+            }
+          })();
+
+          // Stream stderr como texto também
+          void (async () => {
+            for await (const chunk of proc.stderr) {
+              enq(`data: ${JSON.stringify({ text: decoder.decode(chunk, { stream: true }) })}\n\n`);
+            }
+          })();
+
+          void proc.exited.then(code => {
+            enq(`data: ${JSON.stringify({ exitCode: code })}\n\n`);
+            enq('data: [DONE]\n\n');
+            safeClose();
+          });
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          ...CORS_HEADERS,
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
     }
 
     // Static files in production

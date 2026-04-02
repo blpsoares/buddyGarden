@@ -67,11 +67,7 @@ export function generateBones(userId: string): BuddyBones {
   const seed = hashString(seedStr);
   const rand = mulberry32(seed);
 
-  // Species
-  const speciesIdx = Math.floor(rand() * SPECIES_LIST.length);
-  const species = SPECIES_LIST[speciesIdx] as Species;
-
-  // Rarity
+  // Rarity (must come before species to match canonical algorithm order)
   let r = rand();
   let rarity: Rarity = 'common';
   for (const entry of RARITIES) {
@@ -81,6 +77,10 @@ export function generateBones(userId: string): BuddyBones {
     }
     r -= entry.weight;
   }
+
+  // Species
+  const speciesIdx = Math.floor(rand() * SPECIES_LIST.length);
+  const species = SPECIES_LIST[speciesIdx] as Species;
 
   // Eye
   const eyeIdx = Math.floor(rand() * EYES.length);
@@ -134,8 +134,8 @@ export function readUserId(): string | null {
   try {
     const raw = readFileSync(join(homedir(), '.claude.json'), 'utf-8');
     const data = JSON.parse(raw) as Record<string, unknown>;
-    // Try userID (uppercase) first, then oauthAccount?.id
-    const userId = data['userID'] as string | undefined;
+    // Try userId (lowercase d), then oauthAccount?.id
+    const userId = data['userId'] as string | undefined;
     if (userId) return userId;
     const oauth = data['oauthAccount'] as Record<string, unknown> | undefined;
     if (oauth?.['id']) return oauth['id'] as string;
