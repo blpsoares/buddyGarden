@@ -4,6 +4,8 @@ import { BuddySprite } from '../components/BuddySprite.tsx';
 import { DragonBuddy } from '../components/DragonBuddy.tsx';
 import { RarityBadge } from '../components/RarityBadge.tsx';
 import { DragonNightBackground } from '../backgrounds/DragonBackground.tsx';
+import { useSharedChat } from '../context/ChatContext.tsx';
+import { useT } from '../hooks/useT.ts';
 import type { Page } from '../App.tsx';
 
 type Mood = 'happy' | 'excited' | 'tired' | 'bored' | 'focused' | 'chaotic';
@@ -299,10 +301,13 @@ interface Props {
 
 const ALL_SPECIES = ['duck','goose','cat','rabbit','owl','penguin','turtle','snail','dragon','octopus','axolotl','ghost','robot','blob','cactus','mushroom','chonk','capybara'] as const;
 
-interface BalloonMsg { role: 'user' | 'assistant'; content: string; streaming?: boolean; }
-
 export function Garden({ onNavigate }: Props) {
   const { data, loading } = useBuddy();
+  const {
+    messages, send, isStreaming, conversationId, newConversation, isAnonymous,
+  } = useSharedChat();
+  const tl = useT();
+
   const [frame, setFrame] = useState(0);
   const [pos, setPos] = useState({ x: 80, y: 580 });
   const [targetPos, setTargetPos] = useState({ x: 80, y: 580 });
@@ -312,17 +317,42 @@ export function Garden({ onNavigate }: Props) {
   const [chatInput, setChatInput] = useState('');
   const [mood, setMood] = useState<Mood>('happy');
   const [devSpeciesIdx, setDevSpeciesIdx] = useState<number | null>(null);
+  // gardenChatMode persisted in localStorage
+  const [gardenChatMode, setGardenChatMode] = useState<'balloon' | 'modal'>(() => {
+    try { return (localStorage.getItem('gardenChatMode') as 'balloon' | 'modal') ?? 'modal'; }
+    catch { return 'modal'; }
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastClickTime = useRef(0);
 
-  // Balloon chat — estado local, sem ChatContext
-  const [balloonMsgs, setBalloonMsgs] = useState<BalloonMsg[]>([]);
-  const [balloonStreaming, setBalloonStreaming] = useState(false);
+  // Save prompt state (shown after 3rd user message when no conversationId yet)
   const [showSavePrompt, setShowSavePrompt] = useState(false);
-  const [balloonSaved, setBalloonSaved] = useState(false);
   const userMsgCountRef = useRef(0);
+
+  // Persist gardenChatMode
+  useEffect(() => {
+    try { localStorage.setItem('gardenChatMode', gardenChatMode); } catch { /* ignore */ }
+  }, [gardenChatMode]);
+
+  // Start a new conversation when chat opens and messages are empty
+  const prevChatOpen = useRef(false);
+  useEffect(() => {
+    if (chatOpen && !prevChatOpen.current && messages.length === 0) {
+      newConversation(isAnonymous);
+    }
+    prevChatOpen.current = chatOpen;
+  }, [chatOpen, messages.length, newConversation, isAnonymous]);
+
+  // Track user messages to show save prompt
+  useEffect(() => {
+    const userCount = messages.filter(m => m.role === 'user' && !m.hidden).length;
+    if (userCount > 0 && userCount !== userMsgCountRef.current) {
+      userMsgCountRef.current = userCount;
+      if (userCount === 3 && !conversationId) setShowSavePrompt(true);
+    }
+  }, [messages, conversationId]);
 
   // WebSocket mood
   useEffect(() => {
@@ -348,8 +378,7 @@ export function Garden({ onNavigate }: Props) {
     const t = setInterval(() => {
       const c = containerRef.current;
       if (!c) return;
-      // pet walks on the ground line (80% from top = 20% from bottom)
-      const groundY = c.clientHeight * 0.80 - 150; // 150 = approx pet height
+      const groundY = c.clientHeight * 0.80 - 150;
       setTargetPos({
         x: Math.max(20, Math.random() * (c.clientWidth - 160)),
         y: groundY,
@@ -376,89 +405,7 @@ export function Garden({ onNavigate }: Props) {
   // Scroll chat to bottom
   useEffect(() => {
     if (chatOpen) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [balloonMsgs, chatOpen]);
-
-  // sendBalloon: fetch direto para /api/chat sem ChatContext
-  const sendBalloon = useCallback(async (text: string) => {
-    if (balloonStreaming || !text.trim()) return;
-
-    userMsgCountRef.current += 1;
-    const history = balloonMsgs.map(m => ({ role: m.role, content: m.content }));
-
-    setBalloonMsgs(prev => [...prev, { role: 'user', content: text }]);
-    setBalloonStreaming(true);
-    setBalloonMsgs(prev => [...prev, { role: 'assistant', content: '', streaming: true }]);
-
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, history }),
-      });
-
-      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop() ?? '';
-
-        for (const part of parts) {
-          const line = part.trim();
-          if (!line.startsWith('data:')) continue;
-          const raw = line.slice(5).trim();
-          if (raw === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(raw) as { text?: string; error?: string };
-            if (parsed.text) {
-              setBalloonMsgs(prev => {
-                const next = [...prev];
-                const last = next[next.length - 1];
-                if (last?.streaming) next[next.length - 1] = { ...last, content: last.content + parsed.text };
-                return next;
-              });
-            }
-          } catch { /* skip */ }
-        }
-      }
-    } catch { /* ignore */ } finally {
-      setBalloonStreaming(false);
-      setBalloonMsgs(prev => {
-        const next = [...prev];
-        const last = next[next.length - 1];
-        if (last?.streaming) next[next.length - 1] = { ...last, streaming: false };
-        return next;
-      });
-      // Depois da 3ª mensagem do usuário, mostrar prompt de salvar
-      if (userMsgCountRef.current === 3) setShowSavePrompt(true);
-    }
-  }, [balloonStreaming, balloonMsgs]);
-
-  const handleSaveBalloon = useCallback(async () => {
-    setShowSavePrompt(false);
-    try {
-      const firstMsg = balloonMsgs.find(m => m.role === 'user');
-      const res = await fetch('/api/conversations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstMessage: firstMsg?.content ?? 'conversa do jardim' }),
-      });
-      if (!res.ok) return;
-      const { id } = await res.json() as { id: string };
-      await fetch(`/api/conversations/${id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: balloonMsgs.map(m => ({ role: m.role, content: m.content })) }),
-      }).catch(() => {});
-      setBalloonSaved(true);
-    } catch { /* ignore */ }
-  }, [balloonMsgs]);
+  }, [messages, chatOpen]);
 
   const handlePetClick = useCallback(() => {
     const now = Date.now();
@@ -478,15 +425,33 @@ export function Garden({ onNavigate }: Props) {
   const handleChatSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     const text = chatInput.trim();
-    if (!text || balloonStreaming) return;
+    if (!text || isStreaming) return;
     setChatInput('');
-    void sendBalloon(text);
-  }, [chatInput, balloonStreaming, sendBalloon]);
+    void send(text);
+  }, [chatInput, isStreaming, send]);
+
+  const handleFullscreen = useCallback(async () => {
+    // If messages exist but no conversationId, create one before navigating
+    if (messages.filter(m => !m.hidden).length > 0 && !conversationId) {
+      const firstUser = messages.find(m => m.role === 'user' && !m.hidden);
+      if (firstUser) {
+        try {
+          await fetch('/api/conversations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ firstMessage: firstUser.content }),
+          });
+        } catch { /* continue anyway */ }
+      }
+    }
+    onNavigate('chat');
+  }, [messages, conversationId, onNavigate]);
 
   // Precisa ficar antes dos early returns para não violar Rules of Hooks
   const isMoving = Math.hypot(targetPos.x - pos.x, targetPos.y - pos.y) > 5;
+  const visibleMessages = messages.filter(m => !m.hidden);
 
-  if (loading) return <div style={centerStyle}><p style={pixelFont}>Carregando...</p></div>;
+  if (loading) return <div style={centerStyle}><p style={pixelFont}>{tl('loading')}</p></div>;
   if (!data.bones && !data.soul) return <NoBuddy />;
 
   const { bones, soul } = data;
@@ -562,8 +527,15 @@ export function Garden({ onNavigate }: Props) {
         <span style={{ ...pixelFont, fontSize: '8px', marginLeft: 12, color: '#999' }}>
           {data.level} · {data.xp.toLocaleString()} xp
         </span>
-        <button onClick={() => onNavigate('stats')} style={iconBtn} title="stats">📊</button>
-        <button onClick={() => onNavigate('chat')} style={iconBtn} title="chat fullscreen">💬</button>
+        <button onClick={() => onNavigate('stats')} style={iconBtn} title={tl('statsBtn')}>📊</button>
+        <button onClick={() => onNavigate('chat')} style={iconBtn} title={tl('chatBtn')}>💬</button>
+        <button
+          onClick={() => setGardenChatMode(m => m === 'balloon' ? 'modal' : 'balloon')}
+          style={{ ...iconBtn, fontSize: '11px', color: gardenChatMode === 'balloon' ? '#aaf' : '#666' }}
+          title={tl('gardenChatMode')}
+        >
+          {gardenChatMode === 'balloon' ? '💬' : '🗨'}
+        </button>
       </div>
 
       {/* ── Dev species switcher (visível só com ?__debug__=true) ── */}
@@ -620,8 +592,103 @@ export function Garden({ onNavigate }: Props) {
         </div>
       )}
 
-      {/* ── Chat Modal ── */}
-      {chatOpen && bones && (
+      {/* ── Balloon mode: floating speech bubbles above pet ── */}
+      {gardenChatMode === 'balloon' && visibleMessages.length > 0 && (
+        <div style={{
+          position: 'absolute',
+          left: pos.x - 60,
+          top: Math.max(8, pos.y - visibleMessages.slice(-3).length * 72 - 20),
+          zIndex: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          maxWidth: 320,
+          pointerEvents: 'none',
+        }}>
+          {visibleMessages.slice(-3).map((msg, i) => {
+            const text = msg.content.length > 80 ? msg.content.slice(0, 77) + '…' : msg.content;
+            const isUser = msg.role === 'user';
+            return (
+              <div key={i} style={{
+                display: 'flex',
+                flexDirection: isUser ? 'row-reverse' : 'row',
+                alignItems: 'flex-end',
+                gap: 6,
+                pointerEvents: 'auto',
+              }}>
+                {!isUser && bones && (
+                  <div style={{ flexShrink: 0 }}>
+                    {displayBones?.species === 'dragon'
+                      ? <DragonBuddy size={28} mood={mood} isMoving={false} />
+                      : <BuddySprite bones={displayBones ?? bones} frame={0} size={28} />
+                    }
+                  </div>
+                )}
+                <div
+                  title={msg.content}
+                  style={{
+                    maxWidth: 200,
+                    padding: '6px 10px',
+                    background: isUser ? 'rgba(55,55,140,0.88)' : 'rgba(10,10,30,0.88)',
+                    border: `2px solid ${isUser ? 'rgba(100,100,220,0.6)' : 'rgba(80,80,180,0.45)'}`,
+                    color: '#eee',
+                    fontFamily: 'sans-serif',
+                    fontSize: '11px',
+                    lineHeight: 1.45,
+                    wordBreak: 'break-word',
+                    boxShadow: '2px 2px 0 rgba(0,0,0,0.6)',
+                    cursor: msg.content.length > 80 ? 'pointer' : 'default',
+                    opacity: i < 2 ? 0.75 + i * 0.12 : 1,
+                  }}
+                >
+                  {text}
+                  {msg.streaming && <span style={{ marginLeft: 3, animation: 'blink 1s infinite' }}>▌</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Balloon mode input bar — shown when chatOpen in balloon mode */}
+      {gardenChatMode === 'balloon' && chatOpen && (
+        <div style={{
+          position: 'absolute',
+          bottom: 52,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 25,
+          display: 'flex',
+          gap: 6,
+          background: 'rgba(5,5,20,0.9)',
+          border: '2px solid rgba(80,80,180,0.5)',
+          padding: '6px 8px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+          width: 'min(460px, 88vw)',
+        }}>
+          <form onSubmit={handleChatSubmit} style={{ display: 'flex', flex: 1, gap: 6 }}>
+            <input
+              ref={inputRef}
+              type="text"
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              placeholder={isStreaming ? tl('gardenChatWaiting') : tl('gardenChatPlaceholder')}
+              disabled={isStreaming}
+              style={{ ...modalInput, flex: 1 }}
+              autoComplete="off"
+            />
+            <button
+              type="submit"
+              disabled={isStreaming || !chatInput.trim()}
+              style={modalSendBtn(isStreaming || !chatInput.trim())}
+            >▶</button>
+          </form>
+          <button onClick={() => setChatOpen(false)} style={{ ...iconBtn, color: '#ff6666', border: '1px solid #333' }}>✕</button>
+        </div>
+      )}
+
+      {/* ── Chat Modal (modal mode) ── */}
+      {gardenChatMode === 'modal' && chatOpen && bones && (
         <div style={modalBackdrop} onClick={e => { if (e.target === e.currentTarget) setChatOpen(false); }}>
           <div style={modalPanel}>
 
@@ -636,45 +703,55 @@ export function Garden({ onNavigate }: Props) {
                   <span style={{ ...pixelFont, fontSize: '9px', color: '#ddd' }}>
                     {soul?.name ?? bones.species}
                   </span>
-                  {balloonStreaming && (
+                  {isStreaming && (
                     <span style={{ display: 'block', fontFamily: 'sans-serif', fontSize: '10px', color: '#4caf50', marginTop: 2 }}>
-                      digitando...
+                      {tl('gardenChatTyping')}
                     </span>
                   )}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => onNavigate('chat')} style={{ ...iconBtn, fontSize: '11px' }} title="chat fullscreen">⛶</button>
+                <button
+                  onClick={() => { void handleFullscreen(); }}
+                  style={{ ...iconBtn, fontSize: '11px' }}
+                  title={tl('gardenChatFullscreen')}
+                >⛶</button>
                 <button onClick={() => setChatOpen(false)} style={{ ...iconBtn, color: '#ff6666' }}>✕</button>
               </div>
             </div>
 
             {/* Prompt de salvar conversa */}
-            {showSavePrompt && !balloonSaved && (
+            {showSavePrompt && !conversationId && (
               <div style={{ padding: '6px 12px', background: 'rgba(20,20,60,0.95)', borderBottom: '1px solid rgba(80,80,180,0.3)', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
                 <span style={{ fontFamily: 'sans-serif', fontSize: '11px', color: '#aaa' }}>
-                  💾 Salvar esta conversa?
+                  {tl('gardenChatSavePrompt')}
                 </span>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={() => { void handleSaveBalloon(); }} style={{ fontFamily: 'sans-serif', fontSize: '11px', background: '#2a2a7a', border: '1px solid #4a4aaa', color: '#aabbff', cursor: 'pointer', padding: '2px 10px' }}>Sim</button>
-                  <button onClick={() => setShowSavePrompt(false)} style={{ fontFamily: 'sans-serif', fontSize: '11px', background: 'transparent', border: '1px solid #333', color: '#666', cursor: 'pointer', padding: '2px 10px' }}>Não</button>
+                  <button
+                    onClick={() => { newConversation(false); setShowSavePrompt(false); }}
+                    style={{ fontFamily: 'sans-serif', fontSize: '11px', background: '#2a2a7a', border: '1px solid #4a4aaa', color: '#aabbff', cursor: 'pointer', padding: '2px 10px' }}
+                  >{tl('gardenChatSaveYes')}</button>
+                  <button
+                    onClick={() => setShowSavePrompt(false)}
+                    style={{ fontFamily: 'sans-serif', fontSize: '11px', background: 'transparent', border: '1px solid #333', color: '#666', cursor: 'pointer', padding: '2px 10px' }}
+                  >{tl('gardenChatSaveNo')}</button>
                 </div>
               </div>
             )}
-            {balloonSaved && (
+            {conversationId && (
               <div style={{ padding: '4px 12px', background: 'rgba(10,30,10,0.95)', borderBottom: '1px solid rgba(40,120,40,0.3)', fontFamily: 'sans-serif', fontSize: '11px', color: '#4caf50' }}>
-                ✓ conversa salva
+                {tl('gardenChatSaved')}
               </div>
             )}
 
             {/* Messages */}
             <div style={msgArea}>
-              {balloonMsgs.length === 0 && (
+              {visibleMessages.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '24px 12px', color: '#444' }}>
-                  <span style={{ ...pixelFont, fontSize: '8px' }}>diz algo pro teu buddy...</span>
+                  <span style={{ ...pixelFont, fontSize: '8px' }}>{tl('gardenChatEmpty')}</span>
                 </div>
               )}
-              {balloonMsgs.map((msg, i) => (
+              {visibleMessages.map((msg, i) => (
                 <div
                   key={i}
                   style={{
@@ -723,15 +800,15 @@ export function Garden({ onNavigate }: Props) {
                 type="text"
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
-                placeholder={balloonStreaming ? 'aguardando...' : 'mensagem...'}
-                disabled={balloonStreaming}
+                placeholder={isStreaming ? tl('gardenChatWaiting') : tl('gardenChatPlaceholder')}
+                disabled={isStreaming}
                 style={modalInput}
                 autoComplete="off"
               />
               <button
                 type="submit"
-                disabled={balloonStreaming || !chatInput.trim()}
-                style={modalSendBtn(balloonStreaming || !chatInput.trim())}
+                disabled={isStreaming || !chatInput.trim()}
+                style={modalSendBtn(isStreaming || !chatInput.trim())}
               >
                 ▶
               </button>
