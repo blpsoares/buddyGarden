@@ -5,6 +5,7 @@ import { BuddySprite } from '../components/BuddySprite.tsx';
 import { DragonBuddy } from '../components/DragonBuddy.tsx';
 import { MarkdownRenderer } from '../components/MarkdownRenderer.tsx';
 import { PermissionDialog, CommandOutput } from '../components/PermissionDialog.tsx';
+import { useT } from '../hooks/useT.ts';
 
 type Provider = 'claude-cli' | 'anthropic' | 'gemini';
 
@@ -45,17 +46,22 @@ function formatDate(ts: number): string {
 
 export function Chat() {
   const {
-    messages, send, isStreaming, clear, provider,
+    messages, send, isStreaming, clear, provider, claudeModel,
     approveCommand, denyCommand,
     conversationId, isAnonymous, conversations,
     loadConversation, newConversation, removeConversation, setIsAnonymous,
     lang, setLang,
   } = useChat();
+  const tl = useT();
   const { data } = useBuddy();
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const [frame, setFrame] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Export toast state
+  const [exportToast, setExportToast] = useState<{ convId: string; path: string; cmd: string } | null>(null);
+  const [copiedToast, setCopiedToast] = useState(false);
 
   // Setup state
   const [showSetup, setShowSetup] = useState(false);
@@ -123,11 +129,30 @@ export function Chat() {
     } finally {
       setSaving(false);
     }
-  }, [selectedProvider, apiKeyInput]);
+  }, [selectedProvider, apiKeyInput, selectedModel]);
+
+  const handleExportToClause = useCallback(async (convId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch(`/api/conversations/${convId}/export-to-claude`, { method: 'POST' });
+      if (!res.ok) return;
+      const data = await res.json() as { path: string; command: string };
+      setExportToast({ convId, path: data.path, cmd: data.command });
+      setCopiedToast(false);
+    } catch { /* ignore */ }
+  }, []);
 
   const info = PROVIDER_INFO[selectedProvider];
   const petName = data.soul?.name ?? data.bones?.species ?? 'Buddy';
   const isDragon = data.bones?.species === 'dragon';
+
+  // Info bar computations
+  const activeModel = claudeModel || currentModel;
+  const modelDisplay = provider === 'claude-cli'
+    ? (CLAUDE_MODELS.find(m => m.id === activeModel)?.id ?? activeModel)
+    : 'API';
+  const providerDisplay = provider === 'claude-cli' ? 'Claude Code' : provider === 'anthropic' ? 'API Anthropic' : 'API Gemini';
+  const sessionDisplay = conversationId && !isAnonymous ? tl('sessionBuddyGarden') : tl('sessionClaudeCli');
 
   return (
     <div style={outerStyle}>
@@ -135,11 +160,11 @@ export function Chat() {
       {sidebarOpen && (
         <div style={sidebarStyle}>
           <div style={sidebarHeaderStyle}>
-            <span style={pixelText(7)}>conversas</span>
+            <span style={pixelText(9)}>{tl('chatSidebarHeader')}</span>
             <div style={{ display: 'flex', gap: '4px' }}>
               <button
                 style={sidebarBtnStyle(isAnonymous)}
-                title={isAnonymous ? 'modo anônimo ativo' : 'modo anônimo'}
+                title={isAnonymous ? tl('chatAnonymousTitle') : tl('chatAnonymousTitle')}
                 onClick={() => {
                   setIsAnonymous(!isAnonymous);
                   newConversation(!isAnonymous);
@@ -149,7 +174,7 @@ export function Chat() {
               </button>
               <button
                 style={sidebarBtnStyle(false)}
-                title="nova conversa"
+                title={tl('chatNewConv')}
                 onClick={() => newConversation(isAnonymous)}
               >
                 ＋
@@ -160,7 +185,7 @@ export function Chat() {
           {isAnonymous && (
             <div style={anonBadgeStyle}>
               <span style={{ fontFamily: 'sans-serif', fontSize: '10px', color: '#888' }}>
-                👻 modo anônimo — sem histórico
+                {tl('chatAnonymousBadge')}
               </span>
             </div>
           )}
@@ -168,7 +193,7 @@ export function Chat() {
           <div style={convListStyle}>
             {conversations.length === 0 && !isAnonymous && (
               <div style={{ padding: '12px 8px', color: '#444', fontFamily: 'sans-serif', fontSize: '11px', textAlign: 'center' }}>
-                nenhuma conversa ainda
+                {tl('chatNoConversations')}
               </div>
             )}
             {conversations.map(conv => (
@@ -178,23 +203,61 @@ export function Chat() {
                 onClick={() => { void loadConversation(conv.id); }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: 'sans-serif', fontSize: '11px', color: conv.id === conversationId ? '#aabbff' : '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontFamily: 'sans-serif', fontSize: '13px', color: conv.id === conversationId ? '#aabbff' : '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {conv.title}
                   </div>
-                  <div style={{ fontFamily: 'sans-serif', fontSize: '9px', color: '#555', marginTop: '2px' }}>
+                  <div style={{ fontFamily: 'sans-serif', fontSize: '11px', color: '#555', marginTop: '2px' }}>
                     {formatDate(conv.updatedAt)} · {conv.messageCount} msgs
                   </div>
                 </div>
                 <button
+                  style={{ ...deleteConvBtnStyle, color: '#4a8aff', fontSize: '12px' }}
+                  onClick={e => { void handleExportToClause(conv.id, e); }}
+                  title={tl('chatExportConv')}
+                >
+                  ⤴
+                </button>
+                <button
                   style={deleteConvBtnStyle}
                   onClick={e => { e.stopPropagation(); void removeConversation(conv.id); }}
-                  title="apagar"
+                  title={tl('chatDeleteConv')}
                 >
                   ×
                 </button>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Export toast */}
+      {exportToast && (
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(10,10,28,0.97)', border: '2px solid rgba(80,80,180,0.5)',
+          padding: '10px 14px', zIndex: 100,
+          fontFamily: 'monospace', fontSize: '12px', color: '#aabbff',
+          display: 'flex', alignItems: 'center', gap: 10,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.7)',
+          maxWidth: 'calc(100vw - 32px)',
+        }}>
+          <span style={{ flex: 1, wordBreak: 'break-all' }}>{exportToast.cmd}</span>
+          <button
+            style={{ ...iconBtnStyle, fontSize: '11px', color: copiedToast ? '#4caf50' : '#aabbff', border: '1px solid #4a4aaa', padding: '2px 8px' }}
+            onClick={() => {
+              void navigator.clipboard.writeText(exportToast.cmd);
+              setCopiedToast(true);
+              setTimeout(() => setCopiedToast(false), 2000);
+            }}
+          >
+            {copiedToast ? tl('exportCopied') : tl('exportCopy')}
+          </button>
+          <button
+            style={{ ...iconBtnStyle, color: '#ff6666', fontSize: '12px' }}
+            onClick={() => setExportToast(null)}
+          >
+            {tl('exportClose')}
+          </button>
         </div>
       )}
 
@@ -216,21 +279,21 @@ export function Chat() {
           <div style={{ marginLeft: '8px', flex: 1 }}>
             <span style={pixelText(10)}>{petName}</span>
             {isStreaming && (
-              <span style={{ ...pixelText(7), color: '#4caf50', display: 'block' }}>digitando...</span>
+              <span style={{ ...pixelText(7), color: '#4caf50', display: 'block' }}>{tl('chatTyping')}</span>
             )}
           </div>
           <div style={{ display: 'flex', gap: '6px' }}>
             <button
               onClick={() => setLang(lang === 'pt' ? 'en' : 'pt')}
               style={iconBtnStyle}
-              title="trocar idioma"
+              title={tl('chatLangToggle')}
             >
               {lang === 'pt' ? '🇧🇷' : '🇺🇸'}
             </button>
-            <button onClick={() => setShowSetup(s => !s)} style={iconBtnStyle} title="Configurar LLM">
+            <button onClick={() => setShowSetup(s => !s)} style={iconBtnStyle} title={tl('chatConfigBtn')}>
               ⚙
             </button>
-            <button onClick={clear} style={{ ...iconBtnStyle, color: '#ff6666' }} title="Limpar chat">
+            <button onClick={clear} style={{ ...iconBtnStyle, color: '#ff6666' }} title={tl('chatClearBtn')}>
               ✕
             </button>
           </div>
@@ -240,7 +303,7 @@ export function Chat() {
         {showSetup && (
           <div style={setupPanelStyle}>
             <span style={{ ...pixelText(8), display: 'block', marginBottom: '10px' }}>
-              🔧 configurar LLM
+              {tl('chatConfigTitle')}
             </span>
             <form onSubmit={(e) => { void handleSaveConfig(e); }} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -282,7 +345,7 @@ export function Chat() {
 
               {selectedProvider === 'claude-cli' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontFamily: 'sans-serif', fontSize: '11px', color: '#666' }}>modelo</span>
+                  <span style={{ fontFamily: 'sans-serif', fontSize: '11px', color: '#666' }}>{tl('chatConfigModel')}</span>
                   <select
                     value={selectedModel}
                     onChange={e => setSelectedModel(e.target.value as ClaudeModel)}
@@ -317,30 +380,25 @@ export function Chat() {
                 disabled={saving || (selectedProvider !== 'claude-cli' && !apiKeyInput.trim())}
                 style={sendBtnStyle(saving || (selectedProvider !== 'claude-cli' && !apiKeyInput.trim()))}
               >
-                {saving ? 'salvando...' : 'salvar'}
+                {saving ? tl('chatConfigSaving') : tl('chatConfigSave')}
               </button>
             </form>
           </div>
         )}
 
-        {/* Provider badge */}
+        {/* Info bar: Modelo · via Provider · sessão */}
         {!showSetup && (
-          <div style={{ padding: '4px 12px', background: '#0a0a1a', borderBottom: '1px solid #222', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontFamily: 'sans-serif', fontSize: '11px', color: '#444' }}>
-              via {PROVIDER_INFO[currentProvider]?.label ?? currentProvider}
-              {currentProvider === 'claude-cli' && (
-                <span style={{ color: '#333', marginLeft: '6px' }}>
-                  · {CLAUDE_MODELS.find(m => m.id === currentModel)?.label ?? currentModel}
-                </span>
-              )}
+          <div style={{ padding: '4px 12px', background: '#0a0a1a', borderBottom: '1px solid #222', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: 'sans-serif', fontSize: '11px', color: '#3a3a5a' }}>
+              {lang === 'pt' ? 'Modelo' : 'Model'}:
+              {' '}<span style={{ color: '#555' }}>{modelDisplay}</span>
+              {' · '}{tl('chatProviderVia')} <span style={{ color: '#555' }}>{providerDisplay}</span>
+              {' · '}{lang === 'pt' ? 'sessão' : 'session'}: <span style={{ color: conversationId && !isAnonymous ? '#4caf50' : '#555' }}>{sessionDisplay}</span>
             </span>
             {isAnonymous && (
               <span style={{ fontFamily: 'sans-serif', fontSize: '10px', color: '#666', background: '#1a1a1a', border: '1px solid #333', padding: '1px 6px' }}>
-                👻 anônimo
+                {tl('chatAnonBadge')}
               </span>
-            )}
-            {conversationId && !isAnonymous && (
-              <span style={{ fontFamily: 'sans-serif', fontSize: '10px', color: '#4caf50' }}>● salvo</span>
             )}
           </div>
         )}
@@ -349,7 +407,7 @@ export function Chat() {
         <div style={messagesStyle}>
           {messages.length === 0 && (
             <div style={{ textAlign: 'center', padding: '32px', color: '#555' }}>
-              <span style={pixelText(8)}>diz algo pro teu buddy...</span>
+              <span style={pixelText(8)}>{tl('chatEmptyHint')}</span>
             </div>
           )}
           {messages.filter(m => !m.hidden).map((msg, i) => (
@@ -420,7 +478,7 @@ export function Chat() {
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder={isStreaming ? 'aguardando resposta...' : 'mensagem...'}
+            placeholder={isStreaming ? tl('chatWaiting') : tl('chatPlaceholder')}
             disabled={isStreaming}
             style={inputStyle}
           />
@@ -448,8 +506,8 @@ const outerStyle: React.CSSProperties = {
 };
 
 const sidebarStyle: React.CSSProperties = {
-  width: '200px',
-  minWidth: '200px',
+  width: '280px',
+  minWidth: '280px',
   background: '#080810',
   borderRight: '2px solid #1a1a3a',
   display: 'flex',
