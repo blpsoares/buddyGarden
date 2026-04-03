@@ -353,24 +353,31 @@ export function Stats() {
           {/* Atividade */}
           {sessions && (
             <div style={{ ...cardStyle, flex: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <div style={{ fontFamily: 'sans-serif', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em' }}>atividade</div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {(['all', 'claude', 'buddy'] as StatsView[]).map(v => (
-                    <button key={v} onClick={() => setView(v)} style={{
-                      background: view === v ? '#2a2a5a' : 'transparent',
-                      border: `1px solid ${view === v ? '#4a4aaa' : '#222'}`,
-                      color: view === v ? '#aabbff' : '#445',
-                      fontFamily: 'sans-serif', fontSize: 9,
-                      padding: '2px 7px', cursor: 'pointer',
-                      textTransform: 'uppercase', letterSpacing: '0.05em',
-                    }}>
-                      {v === 'all' ? 'Tudo' : v === 'claude' ? 'Claude' : 'Buddy'}
-                    </button>
-                  ))}
-                </div>
+              {/* Título */}
+              <div style={{ fontFamily: 'sans-serif', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>atividade</div>
+
+              {/* Toggle de fonte — abaixo do título */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+                {([
+                  { v: 'all'    as StatsView, label: 'Tudo',   activeColor: '#4a4aaa', activeBg: '#1a1a3a' },
+                  { v: 'claude' as StatsView, label: 'Claude', activeColor: '#4a9edb', activeBg: '#0a1a2a' },
+                  { v: 'buddy'  as StatsView, label: 'Buddy',  activeColor: '#e91e63', activeBg: '#2a0a1a' },
+                ]).map(({ v, label, activeColor, activeBg }) => (
+                  <button key={v} onClick={() => setView(v)} style={{
+                    background: view === v ? activeBg : 'transparent',
+                    border: `1px solid ${view === v ? activeColor : '#2a2a3a'}`,
+                    color: view === v ? activeColor : '#3a3a5a',
+                    fontFamily: 'sans-serif', fontSize: 10, fontWeight: view === v ? 'bold' : 'normal',
+                    padding: '4px 12px', cursor: 'pointer',
+                    textTransform: 'uppercase', letterSpacing: '0.08em',
+                    transition: 'all 0.15s',
+                  }}>
+                    {label}
+                  </button>
+                ))}
               </div>
 
+              {/* Tudo */}
               {view === 'all' && (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
@@ -382,26 +389,36 @@ export function Stats() {
                 </>
               )}
 
-              {view === 'claude' && sessions.claude && (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
-                    <StatChip value={sessions.claude.sessionsToday} label="sessões hoje" color="#4caf50" />
-                    <StatChip value={sessions.claude.sessionsTotal} label="sessões total" color="#2196f3" />
-                    <StatChip value={sessions.claude.messagesTotal} label="mensagens" color="#9c27b0" unit="" />
-                  </div>
-                  <ActivityChart last7Days={sessions.claude.last7Days} />
-                </>
+              {/* Claude */}
+              {view === 'claude' && (
+                sessions.claude
+                  ? <>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
+                        <StatChip value={sessions.claude.sessionsToday} label="sessões hoje" color="#4a9edb" />
+                        <StatChip value={sessions.claude.sessionsTotal} label="sessões total" color="#2196f3" />
+                        <StatChip value={sessions.claude.messagesTotal} label="mensagens" color="#9c27b0" unit="" />
+                      </div>
+                      <ActivityChart last7Days={sessions.claude.last7Days} />
+                    </>
+                  : <div style={{ color: '#444', fontFamily: 'sans-serif', fontSize: 12, padding: '20px 0' }}>
+                      Reinicie o servidor para ver os dados do Claude separados.
+                    </div>
               )}
 
-              {view === 'buddy' && sessions.buddy && (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
-                    <StatChip value={sessions.buddy.sessionsToday} label="chats hoje" color="#4caf50" />
-                    <StatChip value={sessions.buddy.sessionsTotal} label="chats total" color="#2196f3" />
-                    <StatChip value={sessions.buddy.messagesTotal} label="mensagens" color="#e91e63" unit="" />
-                  </div>
-                  <ActivityChart last7Days={sessions.buddy.last7Days} />
-                </>
+              {/* Buddy */}
+              {view === 'buddy' && (
+                sessions.buddy
+                  ? <>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
+                        <StatChip value={sessions.buddy.sessionsToday} label="chats hoje" color="#e91e63" />
+                        <StatChip value={sessions.buddy.sessionsTotal} label="chats total" color="#c2185b" />
+                        <StatChip value={sessions.buddy.messagesTotal} label="mensagens" color="#9c27b0" unit="" />
+                      </div>
+                      <ActivityChart last7Days={sessions.buddy.last7Days} />
+                    </>
+                  : <div style={{ color: '#444', fontFamily: 'sans-serif', fontSize: 12, padding: '20px 0' }}>
+                      Reinicie o servidor para ver os dados do Buddy separados.
+                    </div>
               )}
             </div>
           )}

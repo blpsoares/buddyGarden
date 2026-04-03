@@ -339,27 +339,38 @@ export function Chat() {
               </span>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            {/* Ícone de contexto: Claude (forked) ou Buddy Garden */}
-            <div
-              style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: conversationId ? 'pointer' : 'default' }}
-              onClick={() => conversationId && setShowProjectPicker(true)}
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            {/* Ícone read-only: mostra onde o contexto está salvo (Buddy Garden ou Claude Code) */}
+            <img
+              src={activeConvMeta?.forkedSessionId ? claudeChatIcon : gardenChatIcon}
+              alt={activeConvMeta?.forkedSessionId ? 'Claude Code' : 'Buddy Garden'}
               title={activeConvMeta?.forkedSessionId
                 ? `Forked para Claude · ${activeConvMeta.forkedProjectDir ?? ''}`
-                : projectDir ? `Buddy Garden · ${projectDir}` : 'Buddy Garden (sem pasta)'}
+                : projectDir ? `Buddy Garden · ${projectDir}` : 'Buddy Garden'}
+              style={{ width: 20, height: 20, imageRendering: 'pixelated', opacity: 0.75, flexShrink: 0 }}
+            />
+            {/* Botão de workspace — abre o seletor de pasta */}
+            <button
+              onClick={() => setShowProjectPicker(true)}
+              style={{
+                ...iconBtnStyle,
+                display: 'flex', alignItems: 'center', gap: 4,
+                color: projectDir ? '#6db87a' : '#555',
+                fontSize: 13,
+                border: `1px solid ${projectDir ? '#2a4a2a' : '#222'}`,
+                padding: '3px 8px',
+                background: projectDir ? '#0d1a0d' : 'transparent',
+              }}
+              title={projectDir ? `Workspace: ${projectDir}` : tl('chatProjectBtn')}
             >
-              <img
-                src={activeConvMeta?.forkedSessionId ? claudeChatIcon : gardenChatIcon}
-                alt="context"
-                style={{ width: 22, height: 22, imageRendering: 'pixelated', opacity: conversationId ? 1 : 0.4 }}
-              />
-              {projectDir && (
-                <span style={{ ...projectBadgeStyle, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                  title={projectDir}>
-                  {projectDir.split('/').pop()}
-                </span>
-              )}
-            </div>
+              📁
+              {projectDir
+                ? <span style={{ maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>
+                    {projectDir.split('/').pop()}
+                  </span>
+                : <span style={{ fontSize: 11, color: '#555' }}>pasta</span>
+              }
+            </button>
             <button
               onClick={() => setLang(lang === 'pt' ? 'en' : 'pt')}
               style={{ ...iconBtnStyle, fontSize: 16 }}
