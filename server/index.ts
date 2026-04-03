@@ -143,6 +143,8 @@ Bun.serve({
         total: stats.total,
         streak: stats.streak,
         last7Days: stats.last7Days,
+        claude: stats.claude,
+        buddy: stats.buddy,
       });
     }
 

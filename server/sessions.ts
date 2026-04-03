@@ -3,16 +3,27 @@ import { homedir } from 'os';
 import { join } from 'path';
 
 // --- Types ---
+export interface SourceStats {
+  sessionsToday: number;
+  sessionsTotal: number;
+  messagesTotal: number;
+  last7Days: number[]; // sessões por dia (mais recente = index 6)
+}
+
 export interface SessionStats {
+  // Visão combinada (padrão)
   today: number;
   total: number;
   streak: number;
   xp: number;
   level: LevelTier;
-  levelProgress: number; // 0..1 dentro do tier atual
+  levelProgress: number;
   xpForCurrentLevel: number;
   xpForNextLevel: number;
-  last7Days: number[]; // sessões por dia (mais recente = index 6)
+  last7Days: number[];
+  // Detalhamento por fonte
+  claude: SourceStats;
+  buddy: SourceStats;
 }
 
 export type LevelTier = 'Hatchling' | 'Juvenile' | 'Adult' | 'Elder' | 'Ancient';
@@ -68,7 +79,7 @@ function saveProgress(data: ProgressData): void {
   writeFileSync(PROGRESS_FILE, JSON.stringify(data, null, 2));
 }
 
-// --- Scan JSONL logs ---
+// --- Scan JSONL logs (Claude Code sessions) ---
 interface LogLine {
   timestamp?: string;
   tokens?: number;
@@ -94,13 +105,18 @@ function getBuddyTmpDirName(): string {
   return join(homedir(), '.buddy-garden', 'tmp').replace(/[/.]/g, '-');
 }
 
-function scanLogs(): { sessions: Map<string, string>; totalTokens: number } {
+function scanClaudeLogs(): {
+  sessions: Map<string, string>;   // key → date
+  totalTokens: number;
+  messagesTotal: number;
+} {
   const projectsDir = getClaudeProjectsDir();
-  const sessions = new Map<string, string>(); // sessionId → date (YYYY-MM-DD)
+  const sessions = new Map<string, string>();
   let totalTokens = 0;
+  let messagesTotal = 0;
   const buddyTmpDir = getBuddyTmpDirName();
 
-  if (!existsSync(projectsDir)) return { sessions, totalTokens };
+  if (!existsSync(projectsDir)) return { sessions, totalTokens, messagesTotal };
 
   function scanDir(dir: string) {
     try {
@@ -123,6 +139,11 @@ function scanLogs(): { sessions: Map<string, string>; totalTokens: number } {
 
                 if (sid && ts) {
                   sessions.set(sid + date, date);
+                }
+
+                // Count user messages (type === 'user')
+                if (obj.type === 'user') {
+                  messagesTotal++;
                 }
 
                 // Count tokens
@@ -149,7 +170,41 @@ function scanLogs(): { sessions: Map<string, string>; totalTokens: number } {
   }
 
   scanDir(projectsDir);
-  return { sessions, totalTokens };
+  return { sessions, totalTokens, messagesTotal };
+}
+
+// --- Scan Buddy conversations ---
+interface ConvMeta {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messageCount: number;
+}
+
+const GARDEN_DIR = join(homedir(), '.buddy-garden');
+const CONV_INDEX = join(GARDEN_DIR, 'conversations', 'index.json');
+
+function scanBuddyConversations(): {
+  sessions: Map<string, string>;   // convId → date (by updatedAt)
+  messagesTotal: number;
+} {
+  const sessions = new Map<string, string>();
+  let messagesTotal = 0;
+
+  try {
+    if (!existsSync(CONV_INDEX)) return { sessions, messagesTotal };
+    const convs = JSON.parse(readFileSync(CONV_INDEX, 'utf-8')) as ConvMeta[];
+    for (const conv of convs) {
+      const date = new Date(conv.updatedAt).toISOString().slice(0, 10);
+      sessions.set(conv.id + date, date);
+      messagesTotal += conv.messageCount;
+    }
+  } catch {
+    // ignore
+  }
+
+  return { sessions, messagesTotal };
 }
 
 // --- Compute streak ---
@@ -169,20 +224,46 @@ function computeStreak(dates: Set<string>): number {
   return streak;
 }
 
+// --- Build last7Days array ---
+function buildLast7Days(sessionDates: Map<string, string>): number[] {
+  const last7: number[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const ds = d.toISOString().slice(0, 10);
+    last7.push([...sessionDates.values()].filter(v => v === ds).length);
+  }
+  return last7;
+}
+
 // --- Main export ---
 export function computeSessionStats(): SessionStats {
-  const { sessions, totalTokens } = scanLogs();
+  const { sessions: claudeSessions, totalTokens, messagesTotal: claudeMessages } = scanClaudeLogs();
+  const { sessions: buddySessions, messagesTotal: buddyMessages } = scanBuddyConversations();
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const uniqueDates = new Set<string>(sessions.values());
 
-  const total = sessions.size;
-  const today = [...sessions.values()].filter(d => d === todayStr).length;
-  const streak = computeStreak(uniqueDates);
-  const streakMultiplier = 1.0 + Math.min(streak - 1, 6) * (1.0 / 6.0); // 1.0 to 2.0
+  // Claude stats
+  const claudeUniqueDates = new Set<string>(claudeSessions.values());
+  const claudeSessTotal = claudeSessions.size;
+  const claudeSessToday = [...claudeSessions.values()].filter(d => d === todayStr).length;
+  const claudeLast7 = buildLast7Days(claudeSessions);
+  const streak = computeStreak(claudeUniqueDates);
+
+  // Buddy stats
+  const buddySessTotal = buddySessions.size;
+  const buddySessToday = [...buddySessions.values()].filter(d => d === todayStr).length;
+  const buddyLast7 = buildLast7Days(buddySessions);
+
+  // Combined
+  const combinedSessions = new Map([...claudeSessions, ...buddySessions]);
+  const combinedToday = claudeSessToday + buddySessToday;
+  const combinedTotal = claudeSessTotal + buddySessTotal;
+  const combinedLast7 = claudeLast7.map((v, i) => v + (buddyLast7[i] ?? 0));
 
   // XP: tokens * 0.001 + sessions * 50, multiplied by streak
-  const rawXp = totalTokens * 0.001 + total * 50;
+  const streakMultiplier = 1.0 + Math.min(streak - 1, 6) * (1.0 / 6.0);
+  const rawXp = totalTokens * 0.001 + claudeSessTotal * 50;
   const xp = Math.floor(rawXp * streakMultiplier);
 
   // Save progress
@@ -192,24 +273,27 @@ export function computeSessionStats(): SessionStats {
 
   const lvl = getLevel(finalXp);
 
-  // Last 7 days
-  const last7Days: number[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const ds = d.toISOString().slice(0, 10);
-    last7Days.push([...sessions.values()].filter(v => v === ds).length);
-  }
-
   return {
-    today,
-    total,
+    today: combinedToday,
+    total: combinedTotal,
     streak,
     xp: finalXp,
     level: lvl.tier,
     levelProgress: lvl.progress,
     xpForCurrentLevel: lvl.current,
     xpForNextLevel: lvl.next,
-    last7Days,
+    last7Days: combinedLast7,
+    claude: {
+      sessionsToday: claudeSessToday,
+      sessionsTotal: claudeSessTotal,
+      messagesTotal: claudeMessages,
+      last7Days: claudeLast7,
+    },
+    buddy: {
+      sessionsToday: buddySessToday,
+      sessionsTotal: buddySessTotal,
+      messagesTotal: buddyMessages,
+      last7Days: buddyLast7,
+    },
   };
 }

@@ -6,11 +6,20 @@ import { RarityBadge } from '../components/RarityBadge.tsx';
 import { useT } from '../hooks/useT.ts';
 import type { BuddyBones } from '../hooks/useBuddy.ts';
 
+interface SourceStats {
+  sessionsToday: number;
+  sessionsTotal: number;
+  messagesTotal: number;
+  last7Days: number[];
+}
+
 interface SessionData {
   today: number;
   total: number;
   streak: number;
   last7Days: number[];
+  claude: SourceStats;
+  buddy: SourceStats;
 }
 
 interface BuddyStats {
@@ -187,11 +196,14 @@ function ActivityChart({ last7Days }: { last7Days: number[] }) {
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
+type StatsView = 'all' | 'claude' | 'buddy';
+
 export function Stats() {
   const { data, loading } = useBuddy();
   const tl = useT();
   const [sessions, setSessions] = useState<SessionData | null>(null);
   const [frame, setFrame] = useState(0);
+  const [view, setView] = useState<StatsView>('all');
 
   useEffect(() => {
     const t = setInterval(() => setFrame(f => (f + 1) % 3), 400);
@@ -341,15 +353,56 @@ export function Stats() {
           {/* Atividade */}
           {sessions && (
             <div style={{ ...cardStyle, flex: 1 }}>
-              <div style={{ fontFamily: 'sans-serif', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>atividade</div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
-                <StatChip value={sessions.today}  label={tl('statsSessionsToday')}   color="#4caf50" />
-                <StatChip value={sessions.total}  label={tl('statsSessionsTotal')}  color="#2196f3" />
-                <StatChip value={sessions.streak} label={tl('statsStreak')} color="#ff9800" unit={tl('statsDays')} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div style={{ fontFamily: 'sans-serif', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em' }}>atividade</div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {(['all', 'claude', 'buddy'] as StatsView[]).map(v => (
+                    <button key={v} onClick={() => setView(v)} style={{
+                      background: view === v ? '#2a2a5a' : 'transparent',
+                      border: `1px solid ${view === v ? '#4a4aaa' : '#222'}`,
+                      color: view === v ? '#aabbff' : '#445',
+                      fontFamily: 'sans-serif', fontSize: 9,
+                      padding: '2px 7px', cursor: 'pointer',
+                      textTransform: 'uppercase', letterSpacing: '0.05em',
+                    }}>
+                      {v === 'all' ? 'Tudo' : v === 'claude' ? 'Claude' : 'Buddy'}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <ActivityChart last7Days={sessions.last7Days} />
+              {view === 'all' && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
+                    <StatChip value={sessions.today}  label={tl('statsSessionsToday')} color="#4caf50" />
+                    <StatChip value={sessions.total}  label={tl('statsSessionsTotal')} color="#2196f3" />
+                    <StatChip value={sessions.streak} label={tl('statsStreak')} color="#ff9800" unit={tl('statsDays')} />
+                  </div>
+                  <ActivityChart last7Days={sessions.last7Days} />
+                </>
+              )}
+
+              {view === 'claude' && sessions.claude && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
+                    <StatChip value={sessions.claude.sessionsToday} label="sessões hoje" color="#4caf50" />
+                    <StatChip value={sessions.claude.sessionsTotal} label="sessões total" color="#2196f3" />
+                    <StatChip value={sessions.claude.messagesTotal} label="mensagens" color="#9c27b0" unit="" />
+                  </div>
+                  <ActivityChart last7Days={sessions.claude.last7Days} />
+                </>
+              )}
+
+              {view === 'buddy' && sessions.buddy && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
+                    <StatChip value={sessions.buddy.sessionsToday} label="chats hoje" color="#4caf50" />
+                    <StatChip value={sessions.buddy.sessionsTotal} label="chats total" color="#2196f3" />
+                    <StatChip value={sessions.buddy.messagesTotal} label="mensagens" color="#e91e63" unit="" />
+                  </div>
+                  <ActivityChart last7Days={sessions.buddy.last7Days} />
+                </>
+              )}
             </div>
           )}
         </div>

@@ -59,7 +59,8 @@ function buildSystemPrompt(
     : '';
 
   // Contexto de sessões — só pano de fundo, NÃO citar em toda mensagem
-  const sessionCtx = `[contexto interno: ${stats.today} sessões hoje, streak de ${stats.streak} dias — use isso apenas se o dono perguntar sobre sua atividade ou se for genuinamente relevante para o que está sendo discutido. NÃO mencione isso espontaneamente.]`;
+  const buddyChats = stats.buddy?.sessionsToday ?? stats.today;
+  const sessionCtx = `[contexto interno: ${buddyChats} conversas no buddy hoje, ${stats.streak} dias de streak no Claude — use isso apenas se o dono perguntar sobre sua atividade. NÃO mencione espontaneamente.]`;
 
   const langInstruction = lang === 'en'
     ? 'IMPORTANT: You MUST respond in English only. Never use Portuguese.'
