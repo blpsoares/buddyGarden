@@ -74,6 +74,14 @@ export function Chat() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
+  // Fecha dropdown ao clicar fora
+  useEffect(() => {
+    if (!openMenuId) return;
+    const close = () => setOpenMenuId(null);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [openMenuId]);
+
   // Export toast
   const [exportToast, setExportToast] = useState<{ convId: string; path: string; cmd: string } | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
