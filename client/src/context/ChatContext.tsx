@@ -35,6 +35,9 @@ export interface ConversationMeta {
   createdAt: number;
   updatedAt: number;
   messageCount: number;
+  projectDir?: string;
+  forkedSessionId?: string;
+  forkedProjectDir?: string;
 }
 
 interface ChatContextValue {
@@ -60,6 +63,8 @@ interface ChatContextValue {
   removeConversation: (id: string) => Promise<void>;
   setIsAnonymous: (v: boolean) => void;
   refreshConversations: () => Promise<void>;
+  setConvProjectDir: (dir: string | null) => Promise<void>;
+  activeConvMeta: ConversationMeta | null;
   // i18n
   lang: 'pt' | 'en';
   setLang: (l: 'pt' | 'en') => void;
@@ -176,10 +181,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     try {
       const res = await fetch(`/api/conversations/${id}`);
       if (!res.ok) return;
-      const msgs = await res.json() as Array<{ role: 'user' | 'assistant'; content: string }>;
-      setMessages(msgs.map(m => ({ role: m.role, content: m.content })));
+      const data = await res.json() as { messages: Array<{ role: 'user' | 'assistant'; content: string }>; meta: ConversationMeta };
+      setMessages((data.messages ?? []).map(m => ({ role: m.role, content: m.content })));
       setConversationId(id);
       setIsAnonymous(false);
+      // Atualiza meta na lista para refletir projectDir/forkedSessionId
+      if (data.meta) {
+        setConversations(prev => prev.map(c => c.id === id ? { ...c, ...data.meta } : c));
+      }
     } catch { /* ignore */ }
   }, []);
 
@@ -198,6 +207,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setConversationId(null);
     }
   }, [conversationId]);
+
+  const setConvProjectDir = useCallback(async (dir: string | null) => {
+    const id = conversationIdRef.current;
+    if (!id) return;
+    await fetch(`/api/conversations/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectDir: dir }),
+    }).catch(() => {});
+    setConversations(prev => prev.map(c => {
+      if (c.id !== id) return c;
+      const updated = { ...c };
+      if (dir) updated.projectDir = dir;
+      else delete updated.projectDir;
+      return updated;
+    }));
+  }, []);
 
   const send = useCallback(async (text: string, _hiddenFromUI = false) => {
     if (isStreamingRef.current || !text.trim()) return;
@@ -221,6 +247,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     // Cria conversa no servidor na primeira mensagem (se não anônimo e mensagem visível)
     if (!currentIsAnonymous && !activeConvId && !_hiddenFromUI) {
       try {
+        // Lê projectDir da conversa ativa (se existir) — não existe ainda, então fica undefined
         const res = await fetch('/api/conversations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -473,6 +500,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setConversationId(null);
   }, []);
 
+  const activeConvMeta = conversationId
+    ? (conversations.find(c => c.id === conversationId) ?? null)
+    : null;
+
   return (
     <ChatContext.Provider value={{
       messages, send, isStreaming, apiKeyMissing, setApiKeyMissing,
@@ -480,6 +511,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       conversationId, isAnonymous, conversations,
       loadConversation, newConversation, removeConversation,
       setIsAnonymous, refreshConversations,
+      setConvProjectDir, activeConvMeta,
       lang, setLang,
     }}>
       {children}

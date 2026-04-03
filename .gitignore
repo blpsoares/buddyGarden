@@ -34,9 +34,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .DS_Store
 
 # Dev screenshots e artefatos locais
-*.png
-*.jpg
-*.jpeg
+
 
 # Claude Code internals
 .claude/

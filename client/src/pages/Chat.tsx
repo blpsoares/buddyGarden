@@ -7,6 +7,8 @@ import { MarkdownRenderer } from '../components/MarkdownRenderer.tsx';
 import { PermissionDialog, CommandOutput } from '../components/PermissionDialog.tsx';
 import { useT } from '../hooks/useT.ts';
 import { ProjectPicker } from '../components/ProjectPicker.tsx';
+import gardenChatIcon from '../assets/gardenChat.png';
+import claudeChatIcon from '../assets/claudeChat.png';
 
 type Provider = 'claude-cli' | 'anthropic' | 'gemini';
 
@@ -64,6 +66,7 @@ export function Chat() {
     approveCommand, denyCommand,
     conversationId, isAnonymous, conversations,
     loadConversation, newConversation, removeConversation, setIsAnonymous,
+    setConvProjectDir, activeConvMeta,
     lang, setLang,
   } = useChat();
   const tl = useT();
@@ -97,16 +100,9 @@ export function Chat() {
   const [currentModel, setCurrentModel] = useState<ClaudeModel>('claude-haiku-4-5');
   const [hasApiKey, setHasApiKey] = useState(false);
 
-  // Project context
-  const [projectDir, setProjectDir] = useState<string | null>(null);
+  // Project context — per-conversation
   const [showProjectPicker, setShowProjectPicker] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/project')
-      .then(r => r.json() as Promise<{ dir: string | null }>)
-      .then(d => setProjectDir(d.dir))
-      .catch(() => {});
-  }, []);
+  const projectDir = activeConvMeta?.projectDir ?? null;
 
   useEffect(() => {
     const t = setInterval(() => setFrame(f => (f + 1) % 3), 400);
@@ -182,8 +178,17 @@ export function Chat() {
     try {
       const res = await fetch(`/api/conversations/${convId}/export-to-claude`, { method: 'POST' });
       if (!res.ok) return;
-      const data = await res.json() as { path: string; command: string; sessionId: string };
-      setExportToast({ convId, path: data.path, cmd: data.command });
+      const data = await res.json() as { path: string; command: string; sessionId: string; opened: boolean };
+      // Atualiza meta na lista para refletir forkedSessionId
+      // (o server já salvou, mas precisamos atualizar o estado local)
+      if (data.opened) {
+        // Terminal aberto automaticamente — toast rápido de confirmação
+        setExportToast({ convId, path: data.path, cmd: '✓ Claude aberto no terminal!' });
+        setTimeout(() => setExportToast(null), 3000);
+      } else {
+        // Fallback: mostrar comando para copiar
+        setExportToast({ convId, path: data.path, cmd: data.command });
+      }
       setCopiedToast(false);
     } catch { /* ignore */ }
   }, []);
@@ -335,18 +340,26 @@ export function Chat() {
             )}
           </div>
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            {projectDir && (
-              <span style={projectBadgeStyle} title={projectDir}>
-                📁 {projectDir.split('/').pop()}
-              </span>
-            )}
-            <button
-              onClick={() => setShowProjectPicker(true)}
-              style={{ ...iconBtnStyle, color: projectDir ? '#6db87a' : '#555', fontSize: 16 }}
-              title={tl('chatProjectBtn')}
+            {/* Ícone de contexto: Claude (forked) ou Buddy Garden */}
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: conversationId ? 'pointer' : 'default' }}
+              onClick={() => conversationId && setShowProjectPicker(true)}
+              title={activeConvMeta?.forkedSessionId
+                ? `Forked para Claude · ${activeConvMeta.forkedProjectDir ?? ''}`
+                : projectDir ? `Buddy Garden · ${projectDir}` : 'Buddy Garden (sem pasta)'}
             >
-              📁
-            </button>
+              <img
+                src={activeConvMeta?.forkedSessionId ? claudeChatIcon : gardenChatIcon}
+                alt="context"
+                style={{ width: 22, height: 22, imageRendering: 'pixelated', opacity: conversationId ? 1 : 0.4 }}
+              />
+              {projectDir && (
+                <span style={{ ...projectBadgeStyle, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  title={projectDir}>
+                  {projectDir.split('/').pop()}
+                </span>
+              )}
+            </div>
             <button
               onClick={() => setLang(lang === 'pt' ? 'en' : 'pt')}
               style={{ ...iconBtnStyle, fontSize: 16 }}
@@ -608,7 +621,7 @@ export function Chat() {
         <ProjectPicker
           currentDir={projectDir}
           onClose={() => setShowProjectPicker(false)}
-          onSelect={dir => setProjectDir(dir)}
+          onSelect={dir => { void setConvProjectDir(dir); }}
         />
       )}
     </div>

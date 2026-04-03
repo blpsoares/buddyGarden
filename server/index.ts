@@ -12,10 +12,12 @@ import { streamChat } from './chat.ts';
 import {
   listConversations,
   getConversation,
+  getConversationMeta,
   createConversation,
   appendMessages,
   deleteConversation,
   renameConversation,
+  setConversationProjectDir,
   exportConversationToFile,
 } from './conversations.ts';
 
@@ -154,25 +156,29 @@ Bun.serve({
     }
 
     if (url.pathname === '/api/conversations' && req.method === 'POST') {
-      type CreateBody = { firstMessage: string };
+      type CreateBody = { firstMessage: string; projectDir?: string | null };
       const body = (await req.json()) as CreateBody;
       if (!body.firstMessage?.trim()) return json({ error: 'firstMessage obrigatório' }, 400);
-      return json(createConversation(body.firstMessage.trim()));
+      return json(createConversation(body.firstMessage.trim(), body.projectDir));
     }
 
     const convMatch = url.pathname.match(/^\/api\/conversations\/([^/]+)$/);
     if (convMatch) {
       const id = convMatch[1]!;
       if (req.method === 'GET') {
-        return json(getConversation(id));
+        // Retorna messages + meta (projectDir, forkedSessionId)
+        const messages = getConversation(id);
+        const meta = getConversationMeta(id);
+        return json({ messages, meta });
       }
       if (req.method === 'DELETE') {
         deleteConversation(id);
         return json({ ok: true });
       }
       if (req.method === 'PATCH') {
-        const body = (await req.json()) as { title?: string };
+        const body = (await req.json()) as { title?: string; projectDir?: string | null };
         if (body.title) renameConversation(id, body.title.trim());
+        if ('projectDir' in body) setConversationProjectDir(id, body.projectDir ?? null);
         return json({ ok: true });
       }
     }
@@ -189,11 +195,11 @@ Bun.serve({
       return json({ ok: true });
     }
 
-    // Export conversation to a file for use with Claude CLI
+    // Fork conversation to Claude Code as a real resumable session
     const convExportMatch = url.pathname.match(/^\/api\/conversations\/([^/]+)\/export-to-claude$/);
     if (convExportMatch && req.method === 'POST') {
       const id = convExportMatch[1]!;
-      const result = exportConversationToFile(id);
+      const result = await exportConversationToFile(id);
       if (!result) return json({ error: 'conversa não encontrada ou vazia' }, 404);
       return json(result);
     }
@@ -243,13 +249,20 @@ Bun.serve({
       const bones = userId ? generateBones(userId) : generateBones('anonymous');
       const stats = computeSessionStats();
 
-      // Project context (opcional — lido da config)
+      // Project context — usa projectDir da conversa específica (fallback: config global)
       let projectContextStr: string | undefined;
       try {
-        const cfg = existsSync(CONFIG_PATH)
-          ? JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>
-          : {};
-        const projectDir = cfg['projectDir'] as string | undefined;
+        let projectDir: string | undefined;
+        if (conversationId) {
+          const convMeta = getConversationMeta(conversationId);
+          projectDir = convMeta?.projectDir;
+        }
+        if (!projectDir) {
+          const cfg = existsSync(CONFIG_PATH)
+            ? JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>
+            : {};
+          projectDir = cfg['projectDir'] as string | undefined;
+        }
         if (projectDir && existsSync(projectDir)) {
           const ctx = await buildProjectContext(projectDir);
           projectContextStr = ctx.summary;
