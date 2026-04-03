@@ -315,6 +315,11 @@ export function Garden({ onNavigate }: Props) {
   const [chatOpen, setChatOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [specialPlaying, setSpecialPlaying] = useState(false);
+  const [isSleeping, setIsSleeping] = useState(false);
+
+  // Inatividade: tempo da última interação do usuário com o pet
+  const lastInteractionRef = useRef(Date.now());
+  const wakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [mood, setMood] = useState<Mood>('happy');
   const [devSpeciesIdx, setDevSpeciesIdx] = useState<number | null>(null);
@@ -373,9 +378,27 @@ export function Garden({ onNavigate }: Props) {
     return () => clearInterval(t);
   }, []);
 
-  // Idle walk
+  // Inatividade → sleep após 20s sem interação; acorda em 3min ou no hover/click
   useEffect(() => {
-    if (chatOpen) return;
+    const t = setInterval(() => {
+      if (Date.now() - lastInteractionRef.current > 20_000) {
+        setIsSleeping(prev => {
+          if (prev) return prev; // já dormindo, não reinicia timer
+          if (wakeTimerRef.current) clearTimeout(wakeTimerRef.current);
+          wakeTimerRef.current = setTimeout(() => setIsSleeping(false), 180_000);
+          return true;
+        });
+      }
+    }, 2000);
+    return () => {
+      clearInterval(t);
+      if (wakeTimerRef.current) clearTimeout(wakeTimerRef.current);
+    };
+  }, []);
+
+  // Walk interval — pausa se hovered, dormindo ou chatOpen
+  useEffect(() => {
+    if (chatOpen || isHovered || isSleeping) return;
     const t = setInterval(() => {
       const c = containerRef.current;
       if (!c) return;
@@ -386,37 +409,43 @@ export function Garden({ onNavigate }: Props) {
       });
     }, 4000);
     return () => clearInterval(t);
-  }, [chatOpen]);
+  }, [chatOpen, isHovered, isSleeping]);
 
-  // Smooth movement
+  // Smooth movement — pausa se hovered, dormindo ou chatOpen
   useEffect(() => {
     const t = setInterval(() => {
+      if (chatOpen || isHovered || isSleeping) return;
       setPos(p => {
         const dx = targetPos.x - p.x;
         const dy = targetPos.y - p.y;
         const dist = Math.hypot(dx, dy);
         if (dist < 2) return targetPos;
-        const speed = chatOpen ? 0 : 1.5;
-        return { x: p.x + (dx / dist) * speed, y: p.y + (dy / dist) * speed };
+        return { x: p.x + (dx / dist) * 1.5, y: p.y + (dy / dist) * 1.5 };
       });
     }, 16);
     return () => clearInterval(t);
-  }, [targetPos, chatOpen]);
+  }, [targetPos, chatOpen, isHovered, isSleeping]);
 
   // Scroll chat to bottom
   useEffect(() => {
     if (chatOpen) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, chatOpen]);
 
+  const markInteraction = useCallback(() => {
+    lastInteractionRef.current = Date.now();
+    if (wakeTimerRef.current) clearTimeout(wakeTimerRef.current);
+    setIsSleeping(false);
+  }, []);
+
   const handlePetClick = useCallback(() => {
     lastClickTime.current = Date.now();
-    // Dispara animação special; ao terminar, volta ao normal
+    markInteraction();
     setSpecialPlaying(true);
     setChatOpen(o => {
       if (!o) setTimeout(() => inputRef.current?.focus(), 80);
       return !o;
     });
-  }, []);
+  }, [markInteraction]);
 
   const handleSpecialEnd = useCallback(() => {
     setSpecialPlaying(false);
@@ -579,8 +608,8 @@ export function Garden({ onNavigate }: Props) {
         }}>
           <div
             onClick={handlePetClick}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
+            onMouseEnter={() => { markInteraction(); setIsHovered(true); }}
+            onMouseLeave={() => { lastInteractionRef.current = Date.now(); setIsHovered(false); }}
             style={{
               cursor: 'pointer',
               transform: happy ? 'scale(1.25) rotate(-6deg)' : 'scale(1)',
@@ -593,7 +622,7 @@ export function Garden({ onNavigate }: Props) {
                 mood={mood}
                 isMoving={isMoving}
                 moveDir={moveDir}
-                forceAnim={specialPlaying ? 'special' : isHovered ? 'idle' : undefined}
+                forceAnim={specialPlaying ? 'special' : isSleeping ? 'sleep' : isHovered ? 'idle' : undefined}
                 onAnimEnd={handleSpecialEnd}
               />
             ) : (
@@ -896,9 +925,9 @@ const iconBtn: React.CSSProperties = {
 const modalBackdrop: React.CSSProperties = {
   position: 'absolute', inset: 0, zIndex: 30,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'rgba(5,5,20,0.65)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+  background: 'rgba(5,5,20,0.45)',
+  backdropFilter: 'blur(3px)',
+  WebkitBackdropFilter: 'blur(3px)',
 };
 
 const modalPanel: React.CSSProperties = {
