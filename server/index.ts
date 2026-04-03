@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { buildProjectContext, browseDir } from './project-context.ts';
 
 const BUDDY_LAND_DIR = join(homedir(), '.buddy-garden');
 const CONFIG_PATH = join(BUDDY_LAND_DIR, 'config.json');
@@ -195,6 +196,40 @@ Bun.serve({
       return json(result);
     }
 
+    // ── Project context ──────────────────────────────────────────────────────────
+    if (url.pathname === '/api/project' && req.method === 'GET') {
+      try {
+        const cfg = existsSync(CONFIG_PATH)
+          ? JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>
+          : {};
+        const dir = cfg['projectDir'] as string | undefined;
+        return json({ dir: dir ?? null });
+      } catch { return json({ dir: null }); }
+    }
+
+    if (url.pathname === '/api/project' && req.method === 'POST') {
+      type ProjBody = { dir: string | null };
+      const body = (await req.json()) as ProjBody;
+      if (!existsSync(BUDDY_LAND_DIR)) mkdirSync(BUDDY_LAND_DIR, { recursive: true });
+      const existing = existsSync(CONFIG_PATH)
+        ? JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>
+        : {};
+      if (body.dir === null) {
+        const { projectDir: _, ...rest } = existing as Record<string, unknown> & { projectDir?: string };
+        writeFileSync(CONFIG_PATH, JSON.stringify(rest, null, 2));
+        return json({ ok: true, dir: null });
+      }
+      if (!existsSync(body.dir)) return json({ error: 'Diretório não encontrado' }, 400);
+      writeFileSync(CONFIG_PATH, JSON.stringify({ ...existing, projectDir: body.dir }, null, 2));
+      return json({ ok: true, dir: body.dir });
+    }
+
+    if (url.pathname === '/api/project/browse' && req.method === 'GET') {
+      const path = url.searchParams.get('path') ?? homedir();
+      const result = browseDir(path);
+      return json(result);
+    }
+
     if (url.pathname === '/api/chat' && req.method === 'POST') {
       type ChatBody = { message: string; history?: Array<{ role: 'user' | 'assistant'; content: string }>; conversationId?: string; lang?: 'pt' | 'en' };
       const body = (await req.json()) as ChatBody;
@@ -204,6 +239,19 @@ Bun.serve({
       const soul = readSoul();
       const bones = userId ? generateBones(userId) : generateBones('anonymous');
       const stats = computeSessionStats();
+
+      // Project context (opcional — lido da config)
+      let projectContextStr: string | undefined;
+      try {
+        const cfg = existsSync(CONFIG_PATH)
+          ? JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>
+          : {};
+        const projectDir = cfg['projectDir'] as string | undefined;
+        if (projectDir && existsSync(projectDir)) {
+          const ctx = await buildProjectContext(projectDir);
+          projectContextStr = ctx.summary;
+        }
+      } catch { /* projeto opcional, nunca bloqueia o chat */ }
 
       // Resolve lang: body override > config file > default 'pt'
       const configLang = (() => {
@@ -254,6 +302,7 @@ Bun.serve({
               safeClose();
             },
             chatLang,
+            projectContextStr,
           ).catch((e: unknown) => {
             console.error('Chat error:', e);
             safeClose();

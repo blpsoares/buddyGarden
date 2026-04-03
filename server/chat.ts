@@ -46,6 +46,7 @@ function buildSystemPrompt(
   stats: SessionStats,
   provider: string = 'anthropic',
   lang: 'pt' | 'en' = 'pt',
+  projectContext?: string,
 ): string {
   const name = soul?.name ?? 'Buddy';
   const personality = soul?.personality ?? 'friendly and curious';
@@ -87,7 +88,7 @@ REGRAS:
 - Você é companheiro, não assistente. Pode reclamar, elogiar, provocar.
 - Nunca quebre personagem. Você é ${name}, não uma IA.${todayAwareness}${cliExtra}
 
-${langInstruction}`;
+${langInstruction}${projectContext ? `\n\n---\n\n${projectContext}` : ''}`;
 }
 
 // ── Backend: Anthropic SDK ────────────────────────────────────────────────────
@@ -226,9 +227,10 @@ export async function streamChat(
   onDone: () => void,
   onError: (err: string) => void,
   lang: 'pt' | 'en' = 'pt',
+  projectContext?: string,
 ): Promise<void> {
   const config = readChatConfig();
-  const system = buildSystemPrompt(soul, bones, stats, config.provider, lang);
+  const system = buildSystemPrompt(soul, bones, stats, config.provider, lang, projectContext);
 
   switch (config.provider) {
     case 'anthropic':

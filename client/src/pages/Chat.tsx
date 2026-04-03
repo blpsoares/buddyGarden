@@ -6,6 +6,7 @@ import { DragonBuddy } from '../components/DragonBuddy.tsx';
 import { MarkdownRenderer } from '../components/MarkdownRenderer.tsx';
 import { PermissionDialog, CommandOutput } from '../components/PermissionDialog.tsx';
 import { useT } from '../hooks/useT.ts';
+import { ProjectPicker } from '../components/ProjectPicker.tsx';
 
 type Provider = 'claude-cli' | 'anthropic' | 'gemini';
 
@@ -72,6 +73,17 @@ export function Chat() {
   const [currentProvider, setCurrentProvider] = useState<Provider>('claude-cli');
   const [selectedModel, setSelectedModel] = useState<ClaudeModel>('claude-haiku-4-5');
   const [currentModel, setCurrentModel] = useState<ClaudeModel>('claude-haiku-4-5');
+
+  // Project context
+  const [projectDir, setProjectDir] = useState<string | null>(null);
+  const [showProjectPicker, setShowProjectPicker] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/project')
+      .then(r => r.json() as Promise<{ dir: string | null }>)
+      .then(d => setProjectDir(d.dir))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const t = setInterval(() => setFrame(f => (f + 1) % 3), 400);
@@ -282,7 +294,24 @@ export function Chat() {
               <span style={{ ...pixelText(7), color: '#4caf50', display: 'block' }}>{tl('chatTyping')}</span>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            {projectDir && (
+              <span style={{
+                fontFamily: 'monospace', fontSize: 10, color: '#6a9',
+                background: 'rgba(20,50,30,0.6)', border: '1px solid rgba(60,120,60,0.4)',
+                padding: '2px 6px', maxWidth: 100, overflow: 'hidden',
+                textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }} title={projectDir}>
+                📁 {projectDir.split('/').pop()}
+              </span>
+            )}
+            <button
+              onClick={() => setShowProjectPicker(true)}
+              style={{ ...iconBtnStyle, color: projectDir ? '#6a9' : '#666' }}
+              title={projectDir ? `Projeto: ${projectDir}` : 'Vincular projeto'}
+            >
+              📁
+            </button>
             <button
               onClick={() => setLang(lang === 'pt' ? 'en' : 'pt')}
               style={iconBtnStyle}
@@ -297,6 +326,14 @@ export function Chat() {
               ✕
             </button>
           </div>
+
+          {showProjectPicker && (
+            <ProjectPicker
+              currentDir={projectDir}
+              onClose={() => setShowProjectPicker(false)}
+              onSelect={dir => setProjectDir(dir)}
+            />
+          )}
         </div>
 
         {/* Setup panel */}
