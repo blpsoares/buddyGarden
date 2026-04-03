@@ -87,18 +87,49 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const providerRef = useRef('claude-cli');
   const langRef = useRef<'pt' | 'en'>('pt');
 
-  // Aplica chunk de streaming imediatamente no estado de mensagens
-  const applyChunk = useCallback((text: string) => {
+  // ── Typewriter ────────────────────────────────────────────────────────────────
+  // Fila de chars pendentes + timer que drip-feeds a 18ms/tick (≈55fps).
+  // Velocidade: 4 chars/tick quando fila < 40 chars (parece digitação humana),
+  // 12 chars/tick quando fila > 40 (catch-up sem travar a UI).
+  // Quando o provider envia chunks reais (Anthropic/Gemini), a fila fica sempre
+  // pequena e o efeito é natural. No CLI (1 chunk grande no final), vira animação.
+  const twQueueRef = useRef('');
+  const twTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startTypewriter = useCallback(() => {
+    if (twTimerRef.current) return;
+    twTimerRef.current = setInterval(() => {
+      const q = twQueueRef.current;
+      if (!q.length) return;
+      const take = q.length > 40 ? 12 : 4;
+      const chars = q.slice(0, take);
+      twQueueRef.current = q.slice(take);
+      setMessages(prev => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last?.streaming) next[next.length - 1] = { ...last, content: last.content + chars };
+        return next;
+      });
+    }, 18);
+  }, []);
+
+  const flushTypewriter = useCallback(() => {
+    if (twTimerRef.current) { clearInterval(twTimerRef.current); twTimerRef.current = null; }
+    const remaining = twQueueRef.current;
+    twQueueRef.current = '';
+    if (!remaining) return;
     setMessages(prev => {
       const next = [...prev];
       const last = next[next.length - 1];
-      if (last?.streaming) next[next.length - 1] = { ...last, content: last.content + text };
+      if (last?.streaming) next[next.length - 1] = { ...last, content: last.content + remaining };
       return next;
     });
   }, []);
 
-  // Compatibilidade: flush é no-op agora que aplicamos direto
-  const flushTypewriter = useCallback(() => {}, []);
+  const applyChunk = useCallback((text: string) => {
+    twQueueRef.current += text;
+    startTypewriter();
+  }, [startTypewriter]);
 
   // Sincroniza refs com estados
   useEffect(() => { messagesRef.current = messages; }, [messages]);
