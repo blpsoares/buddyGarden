@@ -147,11 +147,11 @@ export function PlayMode({ onNavigate }: Props) {
       }
     }, 30);
 
-    // 2. Após 400ms pet corre atrás
+    // 2. Após 400ms pet corre atrás (sai completamente da tela)
     fetchTimerRef.current = setTimeout(() => {
       setPlayState('fetching');
       setSpeechBubble(FETCH_PHRASES_PT[0] ?? 'vai lá!');
-      setPetTranslateX('130%');
+      setPetTranslateX('200%');
 
       // Frases rotativas enquanto vai buscar
       let phraseIdx = 0;
@@ -161,13 +161,13 @@ export function PlayMode({ onNavigate }: Props) {
         setSpeechBubble(FETCH_PHRASES_PT[phraseIdx] ?? '...');
       }, 900);
 
-      // 3. Após 3.5s pet volta do lado esquerdo
+      // 3. Após 3.5s pet volta do lado esquerdo (totalmente fora da tela)
       fetchTimerRef.current = setTimeout(() => {
         if (phraseTimerRef.current) clearInterval(phraseTimerRef.current);
         const found = FETCH_FOUND_PT[Math.floor(Math.random() * FETCH_FOUND_PT.length)] ?? 'voltei!';
         setSpeechBubble(found);
         setPlayState('returning');
-        setPetTranslateX('-130%');
+        setPetTranslateX('-200%');
 
         // Sem animação: posição pula para esquerda (fora da tela), depois desliza ao centro
         requestAnimationFrame(() => {
@@ -201,9 +201,11 @@ export function PlayMode({ onNavigate }: Props) {
   const petName = soul?.name ?? bones?.species ?? 'Buddy';
 
   const forceAnim: DragonAnim =
-    playState === 'fetching' || playState === 'throw_anim' || playState === 'returning'
-      ? 'walk'
-      : 'idle';
+    playState === 'fetching' || playState === 'throw_anim'
+      ? 'walkr'
+      : playState === 'returning'
+        ? 'walkl'
+        : 'idle';
 
   const isMoving = playState === 'fetching' || playState === 'returning';
 
@@ -231,12 +233,12 @@ export function PlayMode({ onNavigate }: Props) {
           <div style={{
             position: 'absolute',
             left: `${boneX}%`,
-            top: '30%',
-            fontSize: 28,
+            top: '28%',
+            fontSize: 52,
             zIndex: 30,
             transition: 'none',
-            transform: 'rotate(-30deg)',
-            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
+            animation: 'boneSpin 0.4s linear infinite',
+            filter: 'drop-shadow(0 3px 8px rgba(0,0,0,0.7))',
           }}>
             🦴
           </div>
@@ -329,6 +331,10 @@ export function PlayMode({ onNavigate }: Props) {
           0%   { opacity: 1; transform: translateY(0) scale(1); }
           60%  { opacity: 0.8; transform: translateY(-60px) scale(1.2); }
           100% { opacity: 0; transform: translateY(-100px) scale(0.8); }
+        }
+        @keyframes boneSpin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
         }
       `}</style>
     </div>

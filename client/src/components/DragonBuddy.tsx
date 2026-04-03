@@ -3,21 +3,23 @@ import { useLoadAtlas } from '../hooks/useLoadAtlas.ts';
 import { useSpriteAnimation } from '../hooks/useSpriteAnimation.ts';
 import type { AnimationType } from '../types/sprite.ts';
 
-export type DragonAnim = AnimationType | 'special';
+export type DragonAnim = AnimationType | 'special' | 'walkl' | 'walkr';
 
 interface Props {
   size?: number;
   mood?: string;
   isMoving?: boolean;
+  /** Direção do movimento: 1 = direita, -1 = esquerda */
+  moveDir?: number;
   /** Override: força uma animação específica */
   forceAnim?: DragonAnim;
   /** Chamado quando uma animação "once" (special) termina */
   onAnimEnd?: () => void;
 }
 
-function selectAnimation(mood: string, isMoving: boolean): AnimationType {
+function selectAnimation(mood: string, isMoving: boolean, moveDir: number): AnimationType | 'walkl' | 'walkr' {
   if (mood === 'tired') return 'sleep';
-  if (isMoving) return 'walk';
+  if (isMoving) return moveDir >= 0 ? 'walkr' : 'walkl';
   return 'idle';
 }
 
@@ -41,6 +43,7 @@ export function DragonBuddy({
   size = 200,
   mood = 'happy',
   isMoving = false,
+  moveDir = 1,
   forceAnim,
   onAnimEnd,
 }: Props) {
@@ -48,11 +51,12 @@ export function DragonBuddy({
   const onAnimEndRef = useRef(onAnimEnd);
   useEffect(() => { onAnimEndRef.current = onAnimEnd; }, [onAnimEnd]);
 
-  const baseAnim = selectAnimation(mood, isMoving);
+  const baseAnim = selectAnimation(mood, isMoving, moveDir);
   const animation: DragonAnim = forceAnim ?? baseAnim;
 
   const idle    = useLoadAtlas('/sprites/dragon/idle.json');
-  const walk    = useLoadAtlas('/sprites/dragon/walk.json');
+  const walkl   = useLoadAtlas('/sprites/dragon/walkl.json');
+  const walkr   = useLoadAtlas('/sprites/dragon/walkr.json');
   const sleep   = useLoadAtlas('/sprites/dragon/sleep.json');
   const special = useLoadAtlas('/sprites/dragon/special.json');
 
@@ -61,15 +65,18 @@ export function DragonBuddy({
   }, []);
 
   const { atlas: idleAtlas,    image: idleImg }    = idle;
-  const { atlas: walkAtlas,    image: walkImg }    = walk;
+  const { atlas: walklAtlas,   image: walklImg }   = walkl;
+  const { atlas: walkrAtlas,   image: walkrImg }   = walkr;
   const { atlas: sleepAtlas,   image: sleepImg }   = sleep;
   const { atlas: specialAtlas, image: specialImg } = special;
 
   // FPS por animação
-  const fps = animation === 'sleep' ? 4 : animation === 'walk' ? 10 : animation === 'special' ? 12 : 8;
+  const isWalk = animation === 'walkl' || animation === 'walkr';
+  const fps = animation === 'sleep' ? 4 : isWalk ? 10 : animation === 'special' ? 12 : 8;
 
   const idleFrame    = useSpriteAnimation(animation === 'idle'    ? idleAtlas    : null, fps);
-  const walkFrame    = useSpriteAnimation(animation === 'walk'    ? walkAtlas    : null, fps);
+  const walklFrame   = useSpriteAnimation(animation === 'walkl'   ? walklAtlas   : null, fps);
+  const walkrFrame   = useSpriteAnimation(animation === 'walkr'   ? walkrAtlas   : null, fps);
   const sleepFrame   = useSpriteAnimation(animation === 'sleep'   ? sleepAtlas   : null, fps);
   const specialFrame = useSpriteAnimation(
     animation === 'special' ? specialAtlas : null,
@@ -77,12 +84,13 @@ export function DragonBuddy({
   );
 
   const { image, frame: currentFrame } = useMemo(() => {
-    if (animation === 'walk'    && walkImg    && walkFrame)    return { image: walkImg,    frame: walkFrame };
+    if (animation === 'walkl'   && walklImg   && walklFrame)   return { image: walklImg,   frame: walklFrame };
+    if (animation === 'walkr'   && walkrImg   && walkrFrame)   return { image: walkrImg,   frame: walkrFrame };
     if (animation === 'sleep'   && sleepImg   && sleepFrame)   return { image: sleepImg,   frame: sleepFrame };
     if (animation === 'special' && specialImg && specialFrame) return { image: specialImg, frame: specialFrame };
     if (idleImg && idleFrame)                                  return { image: idleImg,    frame: idleFrame };
     return { image: null, frame: null };
-  }, [animation, walkImg, walkFrame, sleepImg, sleepFrame, specialImg, specialFrame, idleImg, idleFrame]);
+  }, [animation, walklImg, walklFrame, walkrImg, walkrFrame, sleepImg, sleepFrame, specialImg, specialFrame, idleImg, idleFrame]);
 
   const sourceSize = currentFrame?.sourceSize.w ?? 512;
   const scale = size / sourceSize;

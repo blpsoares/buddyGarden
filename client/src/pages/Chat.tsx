@@ -11,31 +11,44 @@ import { ProjectPicker } from '../components/ProjectPicker.tsx';
 type Provider = 'claude-cli' | 'anthropic' | 'gemini';
 
 const CLAUDE_MODELS = [
-  { id: 'claude-haiku-4-5',  label: 'Haiku 4.5 — rápido' },
-  { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6 — inteligente' },
-  { id: 'claude-opus-4-6',   label: 'Opus 4.6 — poderoso' },
+  { id: 'claude-haiku-4-5',  label: 'Haiku 4.5' , desc: 'rápido' },
+  { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6', desc: 'inteligente' },
+  { id: 'claude-opus-4-6',   label: 'Opus 4.6',  desc: 'poderoso' },
 ] as const;
 type ClaudeModel = typeof CLAUDE_MODELS[number]['id'];
 
-const PROVIDER_INFO: Record<Provider, { label: string; placeholder: string; link?: string; free?: string }> = {
-  'claude-cli': {
-    label: 'Claude Code (sua assinatura)',
-    placeholder: '',
-    free: 'Gratuito — usa sua assinatura do Claude Code',
+interface ProviderConfig {
+  id: Provider;
+  label: string;
+  desc: string;
+  keyPlaceholder?: string;
+  keyLink?: string;
+  free: string;
+}
+const PROVIDERS: ProviderConfig[] = [
+  {
+    id: 'claude-cli',
+    label: 'Claude Code',
+    desc: 'Usa sua assinatura existente',
+    free: 'Gratuito — sem custo adicional',
   },
-  'anthropic': {
-    label: 'Claude API (Anthropic)',
-    placeholder: 'sk-ant-api03-...',
-    link: 'https://platform.claude.com/settings/keys',
-    free: 'Pago — ~$0.001 por mensagem (Haiku)',
+  {
+    id: 'anthropic',
+    label: 'Anthropic API',
+    desc: 'Acesso direto via API key',
+    keyPlaceholder: 'sk-ant-api03-...',
+    keyLink: 'https://platform.claude.com/settings/keys',
+    free: 'Pago — ~$0,001 por mensagem',
   },
-  'gemini': {
+  {
+    id: 'gemini',
     label: 'Gemini (Google)',
-    placeholder: 'AIzaSy...',
-    link: 'https://aistudio.google.com/app/apikey',
-    free: 'Grátis — 1500 req/dia no plano gratuito',
+    desc: 'Modelo Gemini Flash',
+    keyPlaceholder: 'AIzaSy...',
+    keyLink: 'https://aistudio.google.com/app/apikey',
+    free: 'Gratuito — 1500 requisições/dia',
   },
-};
+];
 
 function formatDate(ts: number): string {
   const d = new Date(ts);
@@ -47,7 +60,7 @@ function formatDate(ts: number): string {
 
 export function Chat() {
   const {
-    messages, send, isStreaming, clear, provider, claudeModel,
+    messages, send, isStreaming, clear, provider, setProvider, claudeModel, setClaudeModel,
     approveCommand, denyCommand,
     conversationId, isAnonymous, conversations,
     loadConversation, newConversation, removeConversation, setIsAnonymous,
@@ -60,11 +73,11 @@ export function Chat() {
   const [frame, setFrame] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Export toast state
+  // Export toast
   const [exportToast, setExportToast] = useState<{ convId: string; path: string; cmd: string } | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
 
-  // Setup state
+  // Config state
   const [showSetup, setShowSetup] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<Provider>('claude-cli');
   const [apiKeyInput, setApiKeyInput] = useState('');
@@ -73,6 +86,7 @@ export function Chat() {
   const [currentProvider, setCurrentProvider] = useState<Provider>('claude-cli');
   const [selectedModel, setSelectedModel] = useState<ClaudeModel>('claude-haiku-4-5');
   const [currentModel, setCurrentModel] = useState<ClaudeModel>('claude-haiku-4-5');
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   // Project context
   const [projectDir, setProjectDir] = useState<string | null>(null);
@@ -96,10 +110,11 @@ export function Chat() {
 
   useEffect(() => {
     fetch('/api/config')
-      .then(r => r.json() as Promise<{ provider: Provider; claudeModel: ClaudeModel }>)
+      .then(r => r.json() as Promise<{ provider: Provider; claudeModel: ClaudeModel; hasApiKey: boolean }>)
       .then(d => {
         setCurrentProvider(d.provider);
         setSelectedProvider(d.provider);
+        setHasApiKey(!!d.hasApiKey);
         if (d.claudeModel) { setCurrentModel(d.claudeModel); setSelectedModel(d.claudeModel); }
       })
       .catch(() => {});
@@ -118,9 +133,14 @@ export function Chat() {
     setSaving(true);
     setSetupError('');
     try {
-      const body = selectedProvider === 'claude-cli'
-        ? { provider: selectedProvider, claudeModel: selectedModel }
-        : { provider: selectedProvider, apiKey: apiKeyInput.trim() };
+      // Só envia apiKey se o usuário digitou uma nova; caso contrário preserva a salva
+      const body: Record<string, unknown> = {
+        provider: selectedProvider,
+        claudeModel: selectedModel,
+      };
+      if (selectedProvider !== 'claude-cli' && apiKeyInput.trim()) {
+        body['apiKey'] = apiKeyInput.trim();
+      }
 
       const res = await fetch('/api/config', {
         method: 'POST',
@@ -130,8 +150,13 @@ export function Chat() {
       if (res.ok) {
         setCurrentProvider(selectedProvider);
         setCurrentModel(selectedModel);
+        setProvider(selectedProvider);      // atualiza ChatContext para próximas mensagens
+        setClaudeModel(selectedModel);
+        if (apiKeyInput.trim()) {
+          setHasApiKey(true);
+          setApiKeyInput('');
+        }
         setShowSetup(false);
-        setApiKeyInput('');
       } else {
         const d = await res.json() as { error?: string };
         setSetupError(d.error ?? 'Erro ao salvar');
@@ -154,17 +179,12 @@ export function Chat() {
     } catch { /* ignore */ }
   }, []);
 
-  const info = PROVIDER_INFO[selectedProvider];
   const petName = data.soul?.name ?? data.bones?.species ?? 'Buddy';
   const isDragon = data.bones?.species === 'dragon';
 
-  // Info bar computations
   const activeModel = claudeModel || currentModel;
-  const modelDisplay = provider === 'claude-cli'
-    ? (CLAUDE_MODELS.find(m => m.id === activeModel)?.id ?? activeModel)
-    : 'API';
-  const providerDisplay = provider === 'claude-cli' ? 'Claude Code' : provider === 'anthropic' ? 'API Anthropic' : 'API Gemini';
-  const sessionDisplay = conversationId && !isAnonymous ? tl('sessionBuddyGarden') : tl('sessionClaudeCli');
+  const modelLabel = CLAUDE_MODELS.find(m => m.id === activeModel)?.label ?? activeModel;
+  const providerLabel = PROVIDERS.find(p => p.id === (provider || currentProvider))?.label ?? provider;
 
   return (
     <div style={outerStyle}>
@@ -173,10 +193,10 @@ export function Chat() {
         <div style={sidebarStyle}>
           <div style={sidebarHeaderStyle}>
             <span style={pixelText(9)}>{tl('chatSidebarHeader')}</span>
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <button
-                style={sidebarBtnStyle(isAnonymous)}
-                title={isAnonymous ? tl('chatAnonymousTitle') : tl('chatAnonymousTitle')}
+                style={sidebarIconBtn(isAnonymous)}
+                title={tl('chatAnonToggle')}
                 onClick={() => {
                   setIsAnonymous(!isAnonymous);
                   newConversation(!isAnonymous);
@@ -185,7 +205,7 @@ export function Chat() {
                 {isAnonymous ? '👻' : '👁'}
               </button>
               <button
-                style={sidebarBtnStyle(false)}
+                style={sidebarIconBtn(false)}
                 title={tl('chatNewConv')}
                 onClick={() => newConversation(isAnonymous)}
               >
@@ -195,8 +215,8 @@ export function Chat() {
           </div>
 
           {isAnonymous && (
-            <div style={anonBadgeStyle}>
-              <span style={{ fontFamily: 'sans-serif', fontSize: '10px', color: '#888' }}>
+            <div style={anonBannerStyle}>
+              <span style={{ fontSize: '11px', color: '#888' }}>
                 {tl('chatAnonymousBadge')}
               </span>
             </div>
@@ -204,7 +224,7 @@ export function Chat() {
 
           <div style={convListStyle}>
             {conversations.length === 0 && !isAnonymous && (
-              <div style={{ padding: '12px 8px', color: '#444', fontFamily: 'sans-serif', fontSize: '11px', textAlign: 'center' }}>
+              <div style={{ padding: '20px 12px', color: '#444', fontSize: '12px', textAlign: 'center', lineHeight: 1.6 }}>
                 {tl('chatNoConversations')}
               </div>
             )}
@@ -215,27 +235,29 @@ export function Chat() {
                 onClick={() => { void loadConversation(conv.id); }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: 'sans-serif', fontSize: '13px', color: conv.id === conversationId ? '#aabbff' : '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: '13px', color: conv.id === conversationId ? '#aabbff' : '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }}>
                     {conv.title}
                   </div>
-                  <div style={{ fontFamily: 'sans-serif', fontSize: '11px', color: '#555', marginTop: '2px' }}>
+                  <div style={{ fontSize: '11px', color: '#555' }}>
                     {formatDate(conv.updatedAt)} · {conv.messageCount} msgs
                   </div>
                 </div>
-                <button
-                  style={{ ...deleteConvBtnStyle, color: '#4a8aff', fontSize: '12px' }}
-                  onClick={e => { void handleExportToClause(conv.id, e); }}
-                  title={tl('chatExportConv')}
-                >
-                  ⤴
-                </button>
-                <button
-                  style={deleteConvBtnStyle}
-                  onClick={e => { e.stopPropagation(); void removeConversation(conv.id); }}
-                  title={tl('chatDeleteConv')}
-                >
-                  ×
-                </button>
+                <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                  <button
+                    style={convActionBtn('#4a8aff')}
+                    onClick={e => { void handleExportToClause(conv.id, e); }}
+                    title={tl('chatExportConv')}
+                  >
+                    ⤴
+                  </button>
+                  <button
+                    style={convActionBtn('#ff5555')}
+                    onClick={e => { e.stopPropagation(); void removeConversation(conv.id); }}
+                    title={tl('chatDeleteConv')}
+                  >
+                    🗑
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -244,32 +266,26 @@ export function Chat() {
 
       {/* Export toast */}
       {exportToast && (
-        <div style={{
-          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(10,10,28,0.97)', border: '2px solid rgba(80,80,180,0.5)',
-          padding: '10px 14px', zIndex: 100,
-          fontFamily: 'monospace', fontSize: '12px', color: '#aabbff',
-          display: 'flex', alignItems: 'center', gap: 10,
-          boxShadow: '0 4px 24px rgba(0,0,0,0.7)',
-          maxWidth: 'calc(100vw - 32px)',
-        }}>
-          <span style={{ flex: 1, wordBreak: 'break-all' }}>{exportToast.cmd}</span>
-          <button
-            style={{ ...iconBtnStyle, fontSize: '11px', color: copiedToast ? '#4caf50' : '#aabbff', border: '1px solid #4a4aaa', padding: '2px 8px' }}
-            onClick={() => {
-              void navigator.clipboard.writeText(exportToast.cmd);
-              setCopiedToast(true);
-              setTimeout(() => setCopiedToast(false), 2000);
-            }}
-          >
-            {copiedToast ? tl('exportCopied') : tl('exportCopy')}
-          </button>
-          <button
-            style={{ ...iconBtnStyle, color: '#ff6666', fontSize: '12px' }}
-            onClick={() => setExportToast(null)}
-          >
-            {tl('exportClose')}
-          </button>
+        <div style={exportToastStyle}>
+          <div style={{ fontSize: 11, color: '#778', marginBottom: 4 }}>{tl('exportCmd')}</div>
+          <span style={{ flex: 1, wordBreak: 'break-all', fontSize: 12, color: '#aabbff' }}>
+            {exportToast.cmd}
+          </span>
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            <button
+              style={{ ...iconBtnStyle, fontSize: '11px', color: copiedToast ? '#4caf50' : '#aabbff', border: '1px solid #4a4aaa', padding: '3px 10px' }}
+              onClick={() => {
+                void navigator.clipboard.writeText(exportToast.cmd);
+                setCopiedToast(true);
+                setTimeout(() => setCopiedToast(false), 2000);
+              }}
+            >
+              {copiedToast ? tl('exportCopied') : tl('exportCopy')}
+            </button>
+            <button style={{ ...iconBtnStyle, color: '#ff6666', fontSize: '12px' }} onClick={() => setExportToast(null)}>
+              {tl('exportClose')}
+            </button>
+          </div>
         </div>
       )}
 
@@ -282,140 +298,167 @@ export function Chat() {
           </button>
           <div style={{ marginLeft: '8px', flexShrink: 0 }}>
             {isDragon
-              ? <DragonBuddy size={48} mood="happy" isMoving={false} />
+              ? <DragonBuddy size={44} mood="happy" isMoving={false} />
               : data.bones
-                ? <BuddySprite bones={data.bones} frame={frame} size={48} />
+                ? <BuddySprite bones={data.bones} frame={frame} size={44} />
                 : null
             }
           </div>
-          <div style={{ marginLeft: '8px', flex: 1 }}>
-            <span style={pixelText(10)}>{petName}</span>
+          <div style={{ marginLeft: '10px', flex: 1 }}>
+            <span style={pixelText(11)}>{petName}</span>
             {isStreaming && (
-              <span style={{ ...pixelText(7), color: '#4caf50', display: 'block' }}>{tl('chatTyping')}</span>
+              <span style={{ fontFamily: 'sans-serif', fontSize: 12, color: '#4caf50', display: 'block', marginTop: 2 }}>
+                {tl('chatTyping')}
+              </span>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             {projectDir && (
-              <span style={{
-                fontFamily: 'monospace', fontSize: 10, color: '#6a9',
-                background: 'rgba(20,50,30,0.6)', border: '1px solid rgba(60,120,60,0.4)',
-                padding: '2px 6px', maxWidth: 100, overflow: 'hidden',
-                textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }} title={projectDir}>
+              <span style={projectBadgeStyle} title={projectDir}>
                 📁 {projectDir.split('/').pop()}
               </span>
             )}
             <button
               onClick={() => setShowProjectPicker(true)}
-              style={{ ...iconBtnStyle, color: projectDir ? '#6a9' : '#666' }}
-              title={projectDir ? `Projeto: ${projectDir}` : 'Vincular projeto'}
+              style={{ ...iconBtnStyle, color: projectDir ? '#6db87a' : '#555', fontSize: 16 }}
+              title={tl('chatProjectBtn')}
             >
               📁
             </button>
             <button
               onClick={() => setLang(lang === 'pt' ? 'en' : 'pt')}
-              style={iconBtnStyle}
+              style={{ ...iconBtnStyle, fontSize: 16 }}
               title={tl('chatLangToggle')}
             >
               {lang === 'pt' ? '🇧🇷' : '🇺🇸'}
             </button>
-            <button onClick={() => setShowSetup(s => !s)} style={iconBtnStyle} title={tl('chatConfigBtn')}>
+            <button
+              onClick={() => setShowSetup(s => !s)}
+              style={{ ...iconBtnStyle, color: showSetup ? '#aabbff' : '#aaa', fontSize: 16 }}
+              title={tl('chatConfigBtn')}
+            >
               ⚙
             </button>
-            <button onClick={clear} style={{ ...iconBtnStyle, color: '#ff6666' }} title={tl('chatClearBtn')}>
-              ✕
-            </button>
           </div>
-
-          {showProjectPicker && (
-            <ProjectPicker
-              currentDir={projectDir}
-              onClose={() => setShowProjectPicker(false)}
-              onSelect={dir => setProjectDir(dir)}
-            />
-          )}
         </div>
 
-        {/* Setup panel */}
+        {/* Config panel */}
         {showSetup && (
           <div style={setupPanelStyle}>
-            <span style={{ ...pixelText(8), display: 'block', marginBottom: '10px' }}>
-              {tl('chatConfigTitle')}
-            </span>
-            <form onSubmit={(e) => { void handleSaveConfig(e); }} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {(Object.keys(PROVIDER_INFO) as Provider[]).map(p => (
-                  <label key={p} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="provider"
-                      value={p}
-                      checked={selectedProvider === p}
-                      onChange={() => setSelectedProvider(p)}
-                      style={{ marginTop: '3px' }}
-                    />
-                    <div>
-                      <span style={{ fontFamily: 'sans-serif', fontSize: '13px', color: '#ddd' }}>
-                        {PROVIDER_INFO[p].label}
-                      </span>
-                      <br />
-                      <span style={{ fontFamily: 'sans-serif', fontSize: '11px', color: '#4caf50' }}>
-                        {PROVIDER_INFO[p].free}
-                      </span>
-                      {PROVIDER_INFO[p].link && (
-                        <>
-                          {' · '}
-                          <a
-                            href={PROVIDER_INFO[p].link}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{ fontFamily: 'sans-serif', fontSize: '11px', color: '#7a9fff' }}
-                          >
-                            gerar key
-                          </a>
-                        </>
-                      )}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <span style={pixelText(10)}>{tl('chatConfigTitle')}</span>
+              <button onClick={() => setShowSetup(false)} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+
+            <form onSubmit={(e) => { void handleSaveConfig(e); }}>
+              {/* Provider cards */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                {PROVIDERS.map(p => {
+                  const isSelected = selectedProvider === p.id;
+                  const needsKey = p.id !== 'claude-cli';
+                  const keyAlreadySaved = hasApiKey && currentProvider === p.id;
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => setSelectedProvider(p.id)}
+                      style={providerCardStyle(isSelected)}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <div style={{
+                          width: 16, height: 16, borderRadius: '50%', flexShrink: 0, marginTop: 2,
+                          border: `2px solid ${isSelected ? '#7a9fff' : '#333'}`,
+                          background: isSelected ? '#4a6acc' : 'transparent',
+                          boxShadow: isSelected ? '0 0 0 2px rgba(74,106,204,0.3)' : 'none',
+                        }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontFamily: 'sans-serif', fontWeight: 600, fontSize: 14, color: isSelected ? '#eee' : '#aaa' }}>
+                              {p.label}
+                            </span>
+                            {p.id === currentProvider && (
+                              <span style={{ fontSize: 10, color: '#4caf50', background: 'rgba(76,175,80,0.15)', padding: '1px 6px', border: '1px solid rgba(76,175,80,0.3)' }}>
+                                ativo
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 12, color: '#555', marginTop: 2 }}>{p.desc}</div>
+                          <div style={{ fontSize: 11, color: '#4caf50', marginTop: 3 }}>{p.free}</div>
+
+                          {/* Model picker for claude-cli */}
+                          {isSelected && p.id === 'claude-cli' && (
+                            <div style={{ marginTop: 10 }}>
+                              <div style={{ fontSize: 11, color: '#666', marginBottom: 4 }}>{tl('chatConfigModel')}</div>
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                {CLAUDE_MODELS.map(m => (
+                                  <button
+                                    key={m.id}
+                                    type="button"
+                                    onClick={e => { e.stopPropagation(); setSelectedModel(m.id); }}
+                                    style={{
+                                      padding: '5px 10px',
+                                      background: selectedModel === m.id ? 'rgba(74,106,204,0.4)' : 'rgba(20,20,50,0.6)',
+                                      border: `1px solid ${selectedModel === m.id ? '#4a6acc' : '#333'}`,
+                                      color: selectedModel === m.id ? '#aabbff' : '#777',
+                                      cursor: 'pointer',
+                                      fontSize: 12,
+                                      fontFamily: 'sans-serif',
+                                    }}
+                                  >
+                                    <span style={{ fontWeight: 600 }}>{m.label}</span>
+                                    <span style={{ color: '#555', marginLeft: 4 }}>— {m.desc}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* API key field */}
+                          {isSelected && needsKey && (
+                            <div style={{ marginTop: 10 }}>
+                              {keyAlreadySaved && !apiKeyInput && (
+                                <div style={{ fontSize: 11, color: '#6db87a', marginBottom: 6 }}>
+                                  {tl('chatConfigKeySaved')}
+                                </div>
+                              )}
+                              <input
+                                type="password"
+                                value={apiKeyInput}
+                                onChange={e => setApiKeyInput(e.target.value)}
+                                placeholder={keyAlreadySaved ? '••••••••••••' : p.keyPlaceholder}
+                                onClick={e => e.stopPropagation()}
+                                style={keyInputStyle}
+                                autoComplete="off"
+                              />
+                              {p.keyLink && (
+                                <a
+                                  href={p.keyLink}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={e => e.stopPropagation()}
+                                  style={{ fontSize: 11, color: '#7a9fff', display: 'inline-block', marginTop: 4 }}
+                                >
+                                  {tl('chatConfigGenKey')}
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </label>
-                ))}
+                  );
+                })}
               </div>
 
-              {selectedProvider === 'claude-cli' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontFamily: 'sans-serif', fontSize: '11px', color: '#666' }}>{tl('chatConfigModel')}</span>
-                  <select
-                    value={selectedModel}
-                    onChange={e => setSelectedModel(e.target.value as ClaudeModel)}
-                    style={{ ...inputStyle, fontFamily: 'sans-serif', fontSize: '13px', cursor: 'pointer' }}
-                  >
-                    {CLAUDE_MODELS.map(m => (
-                      <option key={m.id} value={m.id}>{m.label}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {selectedProvider !== 'claude-cli' && (
-                <input
-                  type="password"
-                  value={apiKeyInput}
-                  onChange={e => setApiKeyInput(e.target.value)}
-                  placeholder={info.placeholder}
-                  style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '12px' }}
-                  autoFocus
-                />
-              )}
-
               {setupError && (
-                <span style={{ fontFamily: 'sans-serif', fontSize: '12px', color: '#ff6666' }}>
+                <div style={{ fontSize: 12, color: '#ff6666', marginBottom: 10, padding: '6px 10px', background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.2)' }}>
                   {setupError}
-                </span>
+                </div>
               )}
 
               <button
                 type="submit"
-                disabled={saving || (selectedProvider !== 'claude-cli' && !apiKeyInput.trim())}
-                style={sendBtnStyle(saving || (selectedProvider !== 'claude-cli' && !apiKeyInput.trim()))}
+                disabled={saving}
+                style={saveBtnStyle(saving)}
               >
                 {saving ? tl('chatConfigSaving') : tl('chatConfigSave')}
               </button>
@@ -423,28 +466,39 @@ export function Chat() {
           </div>
         )}
 
-        {/* Info bar: Modelo · via Provider · sessão */}
+        {/* Info bar */}
         {!showSetup && (
-          <div style={{ padding: '4px 12px', background: '#0a0a1a', borderBottom: '1px solid #222', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontFamily: 'sans-serif', fontSize: '11px', color: '#3a3a5a' }}>
-              {lang === 'pt' ? 'Modelo' : 'Model'}:
-              {' '}<span style={{ color: '#555' }}>{modelDisplay}</span>
-              {' · '}{tl('chatProviderVia')} <span style={{ color: '#555' }}>{providerDisplay}</span>
-              {' · '}{lang === 'pt' ? 'sessão' : 'session'}: <span style={{ color: conversationId && !isAnonymous ? '#4caf50' : '#555' }}>{sessionDisplay}</span>
+          <div style={infoBarStyle}>
+            <span style={{ fontSize: '12px', color: '#3a3a5a' }}>
+              {modelLabel}
+              <span style={{ color: '#2a2a4a' }}> · </span>
+              <span style={{ color: '#444' }}>{providerLabel}</span>
             </span>
             {isAnonymous && (
-              <span style={{ fontFamily: 'sans-serif', fontSize: '10px', color: '#666', background: '#1a1a1a', border: '1px solid #333', padding: '1px 6px' }}>
+              <span style={{ fontSize: '11px', color: '#666', background: '#111', border: '1px solid #333', padding: '1px 6px' }}>
                 {tl('chatAnonBadge')}
               </span>
             )}
+            {projectDir && (
+              <span style={{ fontSize: '11px', color: '#6db87a' }}>
+                📁 {projectDir.split('/').pop()}
+              </span>
+            )}
+            <button
+              onClick={clear}
+              style={{ marginLeft: 'auto', ...iconBtnStyle, color: '#ff5555', fontSize: 12 }}
+              title={tl('chatClearBtn')}
+            >
+              ✕ {tl('chatClearBtn')}
+            </button>
           </div>
         )}
 
         {/* Messages */}
         <div style={messagesStyle}>
           {messages.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '32px', color: '#555' }}>
-              <span style={pixelText(8)}>{tl('chatEmptyHint')}</span>
+            <div style={{ textAlign: 'center', padding: '48px 24px', color: '#444' }}>
+              <span style={{ ...pixelText(9), color: '#333' }}>{tl('chatEmptyHint')}</span>
             </div>
           )}
           {messages.filter(m => !m.hidden).map((msg, i) => (
@@ -454,31 +508,24 @@ export function Chat() {
                 display: 'flex',
                 flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
                 alignItems: 'flex-start',
-                gap: '8px',
-                marginBottom: '12px',
+                gap: '10px',
+                marginBottom: '14px',
               }}
             >
               {msg.role === 'assistant' && data.bones && (
                 <div style={{ flexShrink: 0 }}>
                   {isDragon
-                    ? <DragonBuddy size={42} mood="happy" isMoving={false} />
-                    : <BuddySprite bones={data.bones} frame={0} size={42} />
+                    ? <DragonBuddy size={44} mood="happy" isMoving={false} />
+                    : <BuddySprite bones={data.bones} frame={0} size={44} />
                   }
                 </div>
               )}
               <div style={{ maxWidth: '75%', display: 'flex', flexDirection: 'column' }}>
-                <div
-                  style={{
-                    padding: '10px 14px',
-                    background: msg.role === 'user' ? '#2a2a6a' : '#1e1e3a',
-                    border: `2px solid ${msg.role === 'user' ? '#4a4aaa' : '#333'}`,
-                    boxShadow: '2px 2px 0 #000',
-                  }}
-                >
+                <div style={msgBubbleStyle(msg.role === 'user')}>
                   {msg.role === 'assistant' ? (
-                    <MarkdownRenderer content={msg.content} streaming={msg.streaming} />
+                    <MarkdownRenderer content={msg.content} streaming={msg.streaming} style={{ fontSize: 15 }} />
                   ) : (
-                    <span style={{ fontFamily: 'sans-serif', fontSize: 14, color: '#eee', lineHeight: 1.5 }}>
+                    <span style={{ fontFamily: 'sans-serif', fontSize: 15, color: '#eee', lineHeight: 1.55 }}>
                       {msg.content}
                     </span>
                   )}
@@ -518,6 +565,7 @@ export function Chat() {
             placeholder={isStreaming ? tl('chatWaiting') : tl('chatPlaceholder')}
             disabled={isStreaming}
             style={inputStyle}
+            autoFocus
           />
           <button
             type="submit"
@@ -532,21 +580,33 @@ export function Chat() {
           @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
         `}</style>
       </div>
+
+      {/* Project picker modal */}
+      {showProjectPicker && (
+        <ProjectPicker
+          currentDir={projectDir}
+          onClose={() => setShowProjectPicker(false)}
+          onSelect={dir => setProjectDir(dir)}
+        />
+      )}
     </div>
   );
 }
+
+// ── Styles ────────────────────────────────────────────────────────────────────
 
 const outerStyle: React.CSSProperties = {
   width: '100%', height: '100%',
   display: 'flex',
   background: '#0d0d1e',
+  fontFamily: 'sans-serif',
 };
 
 const sidebarStyle: React.CSSProperties = {
-  width: '280px',
-  minWidth: '280px',
-  background: '#080810',
-  borderRight: '2px solid #1a1a3a',
+  width: '300px',
+  minWidth: '300px',
+  background: '#080812',
+  borderRight: '1px solid #1a1a30',
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
@@ -556,14 +616,25 @@ const sidebarHeaderStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  padding: '10px 10px 8px',
-  borderBottom: '1px solid #1a1a3a',
+  padding: '12px 12px 10px',
+  borderBottom: '1px solid #1a1a30',
+  background: '#0a0a18',
 };
 
-const anonBadgeStyle: React.CSSProperties = {
-  padding: '6px 10px',
-  background: '#0d0d18',
-  borderBottom: '1px solid #1a1a3a',
+const sidebarIconBtn = (active: boolean): React.CSSProperties => ({
+  background: active ? 'rgba(74,74,170,0.3)' : 'rgba(255,255,255,0.04)',
+  border: `1px solid ${active ? '#4a4aaa' : '#252535'}`,
+  color: active ? '#aabbff' : '#666',
+  cursor: 'pointer',
+  padding: '5px 9px',
+  fontSize: '14px',
+  borderRadius: 2,
+});
+
+const anonBannerStyle: React.CSSProperties = {
+  padding: '7px 12px',
+  background: 'rgba(80,80,80,0.08)',
+  borderBottom: '1px solid #1a1a30',
 };
 
 const convListStyle: React.CSSProperties = {
@@ -577,31 +648,24 @@ const convItemStyle = (active: boolean): React.CSSProperties => ({
   display: 'flex',
   alignItems: 'center',
   gap: '6px',
-  padding: '8px 10px',
+  padding: '10px 12px',
   cursor: 'pointer',
-  background: active ? '#1a1a3a' : 'transparent',
-  borderLeft: active ? '2px solid #4a4aaa' : '2px solid transparent',
+  background: active ? 'rgba(74,74,170,0.15)' : 'transparent',
+  borderLeft: active ? '3px solid #4a4aaa' : '3px solid transparent',
   borderBottom: '1px solid #0f0f1e',
 });
 
-const deleteConvBtnStyle: React.CSSProperties = {
-  background: 'transparent',
-  border: 'none',
-  color: '#444',
+const convActionBtn = (color: string): React.CSSProperties => ({
+  background: `${color}18`,
+  border: `1px solid ${color}44`,
+  color,
   cursor: 'pointer',
-  fontSize: '14px',
-  padding: '0 2px',
+  fontSize: '16px',
+  padding: '5px 8px',
+  opacity: 0.85,
   flexShrink: 0,
   lineHeight: 1,
-};
-
-const sidebarBtnStyle = (active: boolean): React.CSSProperties => ({
-  background: active ? '#1a1a3a' : 'transparent',
-  border: `1px solid ${active ? '#4a4aaa' : '#222'}`,
-  color: active ? '#aabbff' : '#666',
-  cursor: 'pointer',
-  padding: '3px 6px',
-  fontSize: '12px',
+  borderRadius: 3,
 });
 
 const containerStyle: React.CSSProperties = {
@@ -614,61 +678,139 @@ const containerStyle: React.CSSProperties = {
 const headerStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center',
   padding: '8px 12px',
-  background: '#111',
-  borderBottom: '2px solid #333',
+  background: '#0d0d1e',
+  borderBottom: '1px solid #1a1a30',
+  gap: 4,
+};
+
+const projectBadgeStyle: React.CSSProperties = {
+  fontFamily: 'monospace',
+  fontSize: 11,
+  color: '#6db87a',
+  background: 'rgba(20,50,30,0.5)',
+  border: '1px solid rgba(60,120,60,0.35)',
+  padding: '2px 7px',
+  maxWidth: 100,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 };
 
 const setupPanelStyle: React.CSSProperties = {
-  background: '#0d1a2e',
-  border: '2px solid #2255aa',
-  padding: '16px',
-  margin: '8px',
-  boxShadow: '3px 3px 0 #000',
+  background: '#0a0a1e',
+  borderBottom: '1px solid #1a1a40',
+  padding: '16px 18px',
+  overflowY: 'auto',
+  maxHeight: '70vh',
+};
+
+const providerCardStyle = (active: boolean): React.CSSProperties => ({
+  padding: '12px 14px',
+  background: active ? 'rgba(74,106,204,0.12)' : 'rgba(20,20,40,0.5)',
+  border: `1px solid ${active ? 'rgba(74,106,204,0.4)' : 'rgba(40,40,70,0.6)'}`,
+  cursor: 'pointer',
+  transition: 'all 0.15s',
+});
+
+const keyInputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '8px 10px',
+  background: 'rgba(10,10,30,0.8)',
+  border: '1px solid #2a2a5a',
+  color: '#eee',
+  fontFamily: 'monospace',
+  fontSize: 12,
+  outline: 'none',
+  boxSizing: 'border-box',
+};
+
+const saveBtnStyle = (disabled: boolean): React.CSSProperties => ({
+  width: '100%',
+  padding: '10px 16px',
+  background: disabled ? '#1a1a30' : '#3a5acc',
+  border: `1px solid ${disabled ? '#252535' : '#5a7aee'}`,
+  color: disabled ? '#444' : '#fff',
+  cursor: disabled ? 'not-allowed' : 'pointer',
+  fontFamily: '"Press Start 2P", monospace',
+  fontSize: 11,
+  marginTop: 4,
+});
+
+const infoBarStyle: React.CSSProperties = {
+  padding: '6px 14px',
+  background: '#080812',
+  borderBottom: '1px solid #111',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+  flexWrap: 'wrap',
 };
 
 const messagesStyle: React.CSSProperties = {
   flex: 1, overflowY: 'auto',
-  padding: '16px',
+  padding: '18px 16px',
   display: 'flex', flexDirection: 'column',
 };
+
+const msgBubbleStyle = (isUser: boolean): React.CSSProperties => ({
+  padding: '11px 15px',
+  background: isUser ? '#252560' : '#16162e',
+  border: `1px solid ${isUser ? '#3a3a88' : '#252540'}`,
+  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+});
 
 const formStyle: React.CSSProperties = {
   display: 'flex', gap: '8px',
   padding: '10px 12px',
-  background: '#111',
-  borderTop: '2px solid #333',
+  background: '#0d0d1e',
+  borderTop: '1px solid #1a1a30',
 };
 
 const inputStyle: React.CSSProperties = {
-  flex: 1, padding: '8px 12px',
-  background: '#1a1a3a',
-  border: '2px solid #333',
-  boxShadow: '2px 2px 0 #000',
+  flex: 1, padding: '9px 13px',
+  background: '#141430',
+  border: '1px solid #2a2a50',
   color: '#eee',
   fontFamily: 'sans-serif',
-  fontSize: '14px',
+  fontSize: '15px',
   outline: 'none',
 };
 
 const sendBtnStyle = (disabled: boolean): React.CSSProperties => ({
-  padding: '8px 16px',
-  background: disabled ? '#333' : '#4a4aaa',
-  border: '2px solid',
-  borderColor: disabled ? '#444' : '#6a6acc',
-  color: disabled ? '#666' : '#fff',
+  padding: '9px 18px',
+  background: disabled ? '#1a1a30' : '#3a5acc',
+  border: `1px solid ${disabled ? '#252535' : '#5a7aee'}`,
+  color: disabled ? '#444' : '#fff',
   cursor: disabled ? 'not-allowed' : 'pointer',
   fontFamily: '"Press Start 2P", monospace',
   fontSize: '12px',
-  boxShadow: disabled ? 'none' : '2px 2px 0 #000',
+  boxShadow: disabled ? 'none' : '0 2px 8px rgba(58,90,204,0.3)',
 });
 
 const iconBtnStyle: React.CSSProperties = {
   background: 'transparent',
-  border: '1px solid #333',
-  color: '#aaa',
+  border: '1px solid #1e1e35',
+  color: '#888',
   cursor: 'pointer',
-  padding: '4px 8px',
+  padding: '5px 8px',
   fontSize: '14px',
+  borderRadius: 2,
+};
+
+const exportToastStyle: React.CSSProperties = {
+  position: 'fixed',
+  bottom: 24,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  background: 'rgba(8,8,24,0.97)',
+  border: '1px solid rgba(80,80,180,0.5)',
+  padding: '12px 16px',
+  zIndex: 200,
+  maxWidth: 'min(520px, calc(100vw - 32px))',
+  width: '100%',
+  boxShadow: '0 4px 32px rgba(0,0,0,0.7)',
+  display: 'flex',
+  flexDirection: 'column',
 };
 
 function pixelText(size: number): React.CSSProperties {

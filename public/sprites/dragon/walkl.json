@@ -1,0 +1,93 @@
+{
+  "frames": {
+    "frame_0.png": {
+      "frame": {
+        "x": 519,
+        "y": 0,
+        "w": 300,
+        "h": 308
+      },
+      "rotated": false,
+      "trimed": true,
+      "spriteSourceSize": {
+        "x": 150,
+        "y": 99,
+        "w": 450,
+        "h": 407
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 512
+      }
+    },
+    "frame_1.png": {
+      "frame": {
+        "x": 311,
+        "y": 630,
+        "w": 285,
+        "h": 306
+      },
+      "rotated": false,
+      "trimed": true,
+      "spriteSourceSize": {
+        "x": 144,
+        "y": 102,
+        "w": 429,
+        "h": 408
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 512
+      }
+    },
+    "frame_2.png": {
+      "frame": {
+        "x": 0,
+        "y": 637,
+        "w": 311,
+        "h": 315
+      },
+      "rotated": false,
+      "trimed": true,
+      "spriteSourceSize": {
+        "x": 151,
+        "y": 92,
+        "w": 462,
+        "h": 407
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 512
+      }
+    },
+    "frame_3.png": {
+      "frame": {
+        "x": 252,
+        "y": 319,
+        "w": 305,
+        "h": 311
+      },
+      "rotated": false,
+      "trimed": true,
+      "spriteSourceSize": {
+        "x": 151,
+        "y": 97,
+        "w": 456,
+        "h": 408
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 512
+      }
+    }
+  },
+  "meta": {
+    "image": "./walkl.webp",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1024,
+      "h": 1024
+    },
+    "scale": 1
+  }
+}

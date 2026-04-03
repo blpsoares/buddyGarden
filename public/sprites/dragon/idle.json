@@ -182,7 +182,7 @@
     }
   },
   "meta": {
-    "image": "./idle.webp",
+    "image": "https://static.seeles.ai/media/video_sprite_webp/video_sprite_1b0c9559_0e7e_4303_ab69_5a2c6c94d577_1775149095763652151.webp",
     "format": "RGBA8888",
     "size": {
       "w": 1024,

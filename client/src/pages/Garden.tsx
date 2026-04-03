@@ -449,6 +449,7 @@ export function Garden({ onNavigate }: Props) {
 
   // Precisa ficar antes dos early returns para não violar Rules of Hooks
   const isMoving = Math.hypot(targetPos.x - pos.x, targetPos.y - pos.y) > 5;
+  const moveDir = targetPos.x - pos.x; // positivo = direita, negativo = esquerda
   const visibleMessages = messages.filter(m => !m.hidden);
 
   if (loading) return <div style={centerStyle}><p style={pixelFont}>{tl('loading')}</p></div>;
@@ -571,7 +572,7 @@ export function Garden({ onNavigate }: Props) {
           position: 'absolute',
           left: pos.x,
           ...(displayBones.species === 'dragon'
-            ? { bottom: '35%' }   // assenta sobre o chão SVG
+            ? { bottom: '20%', marginBottom: '-10px' }   // assenta sobre o chão SVG
             : { top: pos.y }),
           userSelect: 'none',
         }}>
@@ -585,7 +586,7 @@ export function Garden({ onNavigate }: Props) {
             }}
           >
             {displayBones.species === 'dragon' ? (
-              <DragonBuddy size={200} mood={mood} isMoving={isMoving} />
+              <DragonBuddy size={200} mood={mood} isMoving={isMoving} moveDir={moveDir} />
             ) : (
               <BuddySprite bones={displayBones} frame={frame} size={128} expression={happy ? 'excited' : mood === 'tired' ? 'sleepy' : mood} />
             )}

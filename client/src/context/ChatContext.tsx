@@ -45,6 +45,7 @@ interface ChatContextValue {
   setApiKeyMissing: (v: boolean) => void;
   clear: () => void;
   provider: string;
+  setProvider: (p: string) => void;
   claudeModel: string;
   setClaudeModel: (m: string) => void;
   approveCommand: (msgIdx: number, alwaysAllow: boolean) => Promise<void>;
@@ -271,18 +272,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           if (raw === '[DONE]') continue;
           try {
             const parsed = JSON.parse(raw) as { text?: string; error?: string };
-            if (parsed.error === 'API_KEY_MISSING') {
+            if (parsed.error) {
               flushTypewriter();
-              setApiKeyMissing(true);
+              if (parsed.error === 'API_KEY_MISSING') setApiKeyMissing(true);
+              const errorMsg = parsed.error === 'API_KEY_MISSING'
+                ? '⚠️ API key não configurada. Use ⚙ para configurar.'
+                : `⚠️ ${parsed.error}`;
               setMessages(prev => {
                 const next = [...prev];
                 const last = next[next.length - 1];
                 if (last?.streaming) {
-                  next[next.length - 1] = {
-                    ...last,
-                    content: '⚠️ API key não configurada. Use ⚙ no chat para configurar.',
-                    streaming: false,
-                  };
+                  next[next.length - 1] = { ...last, content: errorMsg, streaming: false };
                 }
                 return next;
               });
@@ -476,7 +476,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   return (
     <ChatContext.Provider value={{
       messages, send, isStreaming, apiKeyMissing, setApiKeyMissing,
-      clear, provider, claudeModel, setClaudeModel, approveCommand, denyCommand, sendCommandResult,
+      clear, provider, setProvider, claudeModel, setClaudeModel, approveCommand, denyCommand, sendCommandResult,
       conversationId, isAnonymous, conversations,
       loadConversation, newConversation, removeConversation,
       setIsAnonymous, refreshConversations,

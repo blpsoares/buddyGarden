@@ -225,7 +225,8 @@ Bun.serve({
     }
 
     if (url.pathname === '/api/project/browse' && req.method === 'GET') {
-      const path = url.searchParams.get('path') ?? homedir();
+      // usa || (não ??) pois string vazia também deve cair no homedir
+      const path = url.searchParams.get('path') || homedir();
       const result = browseDir(path);
       return json(result);
     }
@@ -348,7 +349,11 @@ Bun.serve({
         if (!validProviders.includes(body.provider)) {
           return json({ error: 'Provider inválido' }, 400);
         }
-        if (body.provider !== 'claude-cli' && (!body.apiKey || body.apiKey.length < 10)) {
+        // Só exige key se não há key já salva para este provider
+        const existingKey = existing['apiKey'] as string | undefined;
+        const sendingNewKey = body.apiKey && body.apiKey.length >= 10;
+        const hasExistingKey = existingKey && existingKey.length >= 10;
+        if (body.provider !== 'claude-cli' && !sendingNewKey && !hasExistingKey) {
           return json({ error: 'API key necessária para este provider' }, 400);
         }
       }

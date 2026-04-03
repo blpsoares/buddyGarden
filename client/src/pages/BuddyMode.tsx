@@ -54,7 +54,7 @@ export function BuddyMode({ onNavigate }: Props) {
   const [input, setInput] = useState('');
   const [frame, setFrame] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const roamLoopRef = useRef(0);
 
   // WebSocket mood
@@ -106,9 +106,10 @@ export function BuddyMode({ onNavigate }: Props) {
     inputRef.current?.focus();
   }, []);
 
-  // Scroll para o fim quando chegar nova mensagem
+  // Scroll para o fim — usa scrollTop direto no container para não escapar
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = messagesContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   const handlePetClick = useCallback(() => {
@@ -204,7 +205,7 @@ export function BuddyMode({ onNavigate }: Props) {
         {/* Chat (visível quando há mensagens) */}
         {hasMessages && (
           <div style={chatPanelStyle}>
-            <div style={messagesListStyle}>
+            <div ref={messagesContainerRef} style={messagesListStyle}>
               {messages.map((msg, i) => (
                 <div
                   key={i}
@@ -253,7 +254,7 @@ export function BuddyMode({ onNavigate }: Props) {
                   </div>
                 </div>
               ))}
-              <div ref={messagesEndRef} />
+              <div />
             </div>
           </div>
         )}
@@ -305,7 +306,7 @@ export function BuddyMode({ onNavigate }: Props) {
       {!hasMessages && petState === 'idle' && (
         <div style={hintStyle}>
           <span style={{ fontFamily: 'sans-serif', fontSize: 11, color: '#444' }}>
-            {lang === 'pt' ? 'clique no pet ou envie uma mensagem' : 'click the pet or send a message'}
+            {tl('buddyMsgHint')}
           </span>
         </div>
       )}

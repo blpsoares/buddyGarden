@@ -97,43 +97,63 @@ export function ProjectPicker({ onClose, onSelect, currentDir }: Props) {
           </div>
         )}
 
-        {/* Lista de diretórios */}
+        {/* Usar pasta atual */}
+        <div style={useCurrentStyle}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#888' }}>
+              pasta atual:
+            </span>
+            <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#aac', marginLeft: 6, wordBreak: 'break-all' }}>
+              {browsePath || '~'}
+            </span>
+          </div>
+          <button
+            onClick={() => browsePath ? void handleSelect(browsePath) : undefined}
+            disabled={!browsePath}
+            style={currentSelectBtnStyle(!browsePath)}
+            title="Usar esta pasta como contexto do projeto"
+          >
+            ✓ usar esta pasta
+          </button>
+        </div>
+
+        {/* Lista de subpastas */}
         <div style={listStyle}>
           {loading ? (
             <div style={loadingStyle}>carregando...</div>
           ) : entries.length === 0 ? (
-            <div style={loadingStyle}>nenhum subdiretório</div>
+            <div style={loadingStyle}>nenhuma subpasta aqui</div>
           ) : (
             entries.map(e => (
               <div key={e.path} style={entryRowStyle}>
                 <button
                   onClick={() => void browse(e.path)}
                   style={entryBtnStyle(false)}
-                  title="Navegar"
+                  title={`Abrir ${e.name}`}
                 >
-                  📂 {e.name}
+                  <span style={{ marginRight: 6, opacity: 0.7 }}>📁</span>
+                  {e.name}
+                  <span style={{ marginLeft: 'auto', fontSize: 10, color: '#444', paddingLeft: 8 }}>abrir →</span>
                 </button>
                 <button
                   onClick={() => void handleSelect(e.path)}
                   style={selectBtnStyle}
-                  title="Usar este diretório como contexto"
+                  title={`Usar ${e.name} como contexto`}
                 >
-                  ✓ usar
+                  ✓
                 </button>
               </div>
             ))
           )}
         </div>
 
-        {/* Selecionar o diretório atual */}
+        {/* Footer */}
         <div style={footerStyle}>
-          <button
-            onClick={() => browsePath ? void handleSelect(browsePath) : undefined}
-            disabled={!browsePath}
-            style={currentSelectBtnStyle(!browsePath)}
-          >
-            📌 usar "{browsePath.split('/').pop() || browsePath}"
-          </button>
+          {currentDir && (
+            <div style={{ width: '100%', fontSize: 11, color: '#666', marginBottom: 8, fontFamily: 'monospace' }}>
+              atual: {currentDir}
+            </div>
+          )}
           {currentDir && (
             <button onClick={handleClear} style={clearBtnStyle}>
               ✕ remover projeto
@@ -233,6 +253,15 @@ const loadingStyle: React.CSSProperties = {
   color: '#555',
 };
 
+const useCurrentStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '10px 14px',
+  background: 'rgba(40,80,40,0.12)',
+  borderBottom: '1px solid rgba(60,120,60,0.25)',
+};
+
 const entryRowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -253,6 +282,8 @@ function entryBtnStyle(_active: boolean): React.CSSProperties {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    display: 'flex',
+    alignItems: 'center',
   };
 }
 
@@ -278,16 +309,15 @@ const footerStyle: React.CSSProperties = {
 };
 
 const currentSelectBtnStyle = (disabled: boolean): React.CSSProperties => ({
-  flex: 1,
-  padding: '8px 12px',
-  background: disabled ? 'rgba(20,20,40,0.5)' : 'rgba(40,80,40,0.7)',
-  border: `1px solid ${disabled ? 'rgba(40,40,60,0.4)' : 'rgba(80,140,80,0.5)'}`,
-  color: disabled ? '#444' : '#aea',
+  flexShrink: 0,
+  padding: '7px 14px',
+  background: disabled ? 'rgba(20,20,40,0.5)' : 'rgba(40,100,50,0.8)',
+  border: `1px solid ${disabled ? 'rgba(40,40,60,0.4)' : 'rgba(80,160,80,0.6)'}`,
+  color: disabled ? '#444' : '#cfeecf',
   cursor: disabled ? 'not-allowed' : 'pointer',
   fontFamily: 'sans-serif',
   fontSize: 12,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
+  fontWeight: 600,
   whiteSpace: 'nowrap',
 });
 
