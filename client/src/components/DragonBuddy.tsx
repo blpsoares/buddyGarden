@@ -19,7 +19,7 @@ interface Props {
 
 function selectAnimation(isMoving: boolean, moveDir: number): AnimationType | 'walkl' | 'walkr' {
   if (isMoving) return moveDir >= 0 ? 'walkr' : 'walkl';
-  return 'sleep'; // parado = dormindo; idle só via forceAnim (hover)
+  return 'idle'; // entre targets: idle neutro; sleep só via forceAnim explícito
 }
 
 function drawAtlasFrame(

@@ -315,11 +315,13 @@ export function Garden({ onNavigate }: Props) {
   const [chatOpen, setChatOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [specialPlaying, setSpecialPlaying] = useState(false);
-  const [isSleeping, setIsSleeping] = useState(false);
+  const [isSleeping, setIsSleeping] = useState(false);       // inatividade (20s)
+  const [isNaturallyResting, setIsNaturallyResting] = useState(false); // descanso natural entre caminhadas
 
-  // Inatividade: tempo da última interação do usuário com o pet
-  const lastInteractionRef = useRef(Date.now());
-  const wakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Timers — todos via ref para evitar closures stale
+  const sleepTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wakeTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const walkTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [mood, setMood] = useState<Mood>('happy');
   const [devSpeciesIdx, setDevSpeciesIdx] = useState<number | null>(null);
@@ -378,43 +380,76 @@ export function Garden({ onNavigate }: Props) {
     return () => clearInterval(t);
   }, []);
 
-  // Inatividade → sleep após 20s sem interação; acorda em 3min ou no hover/click
-  useEffect(() => {
-    const t = setInterval(() => {
-      if (Date.now() - lastInteractionRef.current > 20_000) {
-        setIsSleeping(prev => {
-          if (prev) return prev; // já dormindo, não reinicia timer
-          if (wakeTimerRef.current) clearTimeout(wakeTimerRef.current);
+  // ── Sleep por inatividade (timeout chain, sem polling) ──────────────────────
+  // markInteraction cancela timers pendentes e reinicia a contagem de 20s.
+  const markInteraction = useCallback(() => {
+    setIsSleeping(false);
+    if (sleepTimerRef.current) { clearTimeout(sleepTimerRef.current); sleepTimerRef.current = null; }
+    if (wakeTimerRef.current)  { clearTimeout(wakeTimerRef.current);  wakeTimerRef.current  = null; }
+    // Agenda próximo sleep em 20s
+    sleepTimerRef.current = setTimeout(() => {
+      setIsSleeping(true);
+      wakeTimerRef.current = setTimeout(() => {
+        setIsSleeping(false);
+        // depois de acordar, reinicia contagem normal
+        sleepTimerRef.current = setTimeout(() => {
+          setIsSleeping(true);
           wakeTimerRef.current = setTimeout(() => setIsSleeping(false), 180_000);
-          return true;
-        });
-      }
-    }, 2000);
-    return () => {
-      clearInterval(t);
-      if (wakeTimerRef.current) clearTimeout(wakeTimerRef.current);
-    };
+        }, 20_000);
+      }, 180_000);
+    }, 20_000);
   }, []);
 
-  // Walk interval — pausa se hovered, dormindo ou chatOpen
+  // Inicializa a contagem de inatividade no mount
   useEffect(() => {
-    if (chatOpen || isHovered || isSleeping) return;
-    const t = setInterval(() => {
+    markInteraction();
+    return () => {
+      if (sleepTimerRef.current) clearTimeout(sleepTimerRef.current);
+      if (wakeTimerRef.current)  clearTimeout(wakeTimerRef.current);
+      if (walkTimerRef.current)  clearTimeout(walkTimerRef.current);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Walk / descanso natural (timer chain, sem interval) ──────────────────────
+  // isSleepingRef para leitura síncrona dentro dos timers
+  const isSleepingRef = useRef(false);
+  const isHoveredRef  = useRef(false);
+  useEffect(() => { isSleepingRef.current = isSleeping; }, [isSleeping]);
+  useEffect(() => { isHoveredRef.current  = isHovered;  }, [isHovered]);
+
+  useEffect(() => {
+    const pickTarget = () => {
       const c = containerRef.current;
       if (!c) return;
       const groundY = c.clientHeight * 0.80 - 150;
-      setTargetPos({
-        x: Math.max(20, Math.random() * (c.clientWidth - 160)),
-        y: groundY,
-      });
-    }, 4000);
-    return () => clearInterval(t);
-  }, [chatOpen, isHovered, isSleeping]);
+      setTargetPos({ x: Math.max(20, Math.random() * (c.clientWidth - 160)), y: groundY });
+    };
 
-  // Smooth movement — pausa se hovered, dormindo ou chatOpen
+    const runCycle = () => {
+      if (walkTimerRef.current) clearTimeout(walkTimerRef.current);
+      // 30% chance de descansar antes de caminhar
+      if (Math.random() < 0.3) {
+        setIsNaturallyResting(true);
+        walkTimerRef.current = setTimeout(() => {
+          setIsNaturallyResting(false);
+          pickTarget();
+          walkTimerRef.current = setTimeout(runCycle, 5000 + Math.random() * 4000);
+        }, 4000 + Math.random() * 3000);
+      } else {
+        pickTarget();
+        walkTimerRef.current = setTimeout(runCycle, 5000 + Math.random() * 4000);
+      }
+    };
+
+    // Começa primeiro ciclo após 1s
+    walkTimerRef.current = setTimeout(runCycle, 1000);
+    return () => { if (walkTimerRef.current) clearTimeout(walkTimerRef.current); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Smooth movement — para quando hovered, dormindo ou chatOpen ──────────────
   useEffect(() => {
     const t = setInterval(() => {
-      if (chatOpen || isHovered || isSleeping) return;
+      if (chatOpen || isHoveredRef.current || isSleepingRef.current) return;
       setPos(p => {
         const dx = targetPos.x - p.x;
         const dy = targetPos.y - p.y;
@@ -424,18 +459,12 @@ export function Garden({ onNavigate }: Props) {
       });
     }, 16);
     return () => clearInterval(t);
-  }, [targetPos, chatOpen, isHovered, isSleeping]);
+  }, [targetPos, chatOpen]);
 
   // Scroll chat to bottom
   useEffect(() => {
     if (chatOpen) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, chatOpen]);
-
-  const markInteraction = useCallback(() => {
-    lastInteractionRef.current = Date.now();
-    if (wakeTimerRef.current) clearTimeout(wakeTimerRef.current);
-    setIsSleeping(false);
-  }, []);
 
   const handlePetClick = useCallback(() => {
     lastClickTime.current = Date.now();
