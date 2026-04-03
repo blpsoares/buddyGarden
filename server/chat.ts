@@ -177,7 +177,6 @@ async function streamViaCLI(
   onDone: () => void,
   onError: (err: string) => void,
 ): Promise<void> {
-  // Filtra mensagens vazias (respostas que falharam/ficaram em branco)
   const cleanHistory = history.filter(h => h.content.trim().length > 0);
 
   let prompt = `${system}\n\n---\n\n`;
@@ -187,24 +186,59 @@ async function streamViaCLI(
   prompt += `Usuário: ${message}\n\nVocê:`;
 
   try {
-    // Passa via stdin — evita limite de argumento e problemas com caracteres especiais
     const tmpDir = join(homedir(), '.buddy-garden', 'tmp');
     if (!existsSync(tmpDir)) { const { mkdirSync } = await import('fs'); mkdirSync(tmpDir, { recursive: true }); }
+
+    // --output-format stream-json --verbose: emite eventos JSON incrementais
+    // com o texto acumulado crescendo a cada token batch gerado pelo modelo.
     const proc = Bun.spawn(
-      ['claude', '--print', '--model', model],
+      ['claude', '--print', '--output-format', 'stream-json', '--verbose', '--model', model],
       { stdout: 'pipe', stderr: 'pipe', stdin: 'pipe', cwd: tmpDir },
     );
     proc.stdin.write(prompt);
     proc.stdin.end();
 
     const decoder = new TextDecoder();
-    for await (const chunk of proc.stdout) {
-      const text = decoder.decode(chunk, { stream: true });
-      if (text) onChunk(text);
+    let lineBuffer = '';
+    let emittedLength = 0; // chars já enviados via onChunk
+    let gotResult = false;
+
+    for await (const raw of proc.stdout) {
+      lineBuffer += decoder.decode(raw, { stream: true });
+      const lines = lineBuffer.split('\n');
+      lineBuffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const event = JSON.parse(trimmed) as Record<string, unknown>;
+
+          if (event['type'] === 'assistant') {
+            // Cada evento de assistente tem o texto ACUMULADO até agora.
+            // Enviamos apenas o delta (novo trecho) via onChunk.
+            type ContentBlock = { type: string; text?: string };
+            const msg = event['message'] as { content?: ContentBlock[] } | undefined;
+            if (!msg?.content) continue;
+            for (const block of msg.content) {
+              if (block.type === 'text' && typeof block.text === 'string') {
+                const delta = block.text.slice(emittedLength);
+                if (delta) { onChunk(delta); emittedLength = block.text.length; }
+              }
+            }
+          } else if (event['type'] === 'result') {
+            gotResult = true;
+            if ((event as { subtype?: string })['subtype'] === 'error') {
+              onError(String((event as { error?: unknown })['error'] ?? 'Erro no claude CLI'));
+              return;
+            }
+          }
+        } catch { /* ignora linhas malformadas */ }
+      }
     }
 
     const exit = await proc.exited;
-    if (exit !== 0) {
+    if (exit !== 0 && !gotResult) {
       const errText = await new Response(proc.stderr).text();
       onError(`Erro no claude CLI: ${errText.slice(0, 200)}`);
       return;

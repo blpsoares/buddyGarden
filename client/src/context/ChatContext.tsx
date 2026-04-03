@@ -87,40 +87,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const providerRef = useRef('claude-cli');
   const langRef = useRef<'pt' | 'en'>('pt');
 
-  // Typewriter queue: recebe chunks brutos, anima char a char
-  const twQueueRef = useRef('');
-  const twTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const startTypewriter = useCallback(() => {
-    if (twTimerRef.current) return;
-    twTimerRef.current = setInterval(() => {
-      const q = twQueueRef.current;
-      if (!q.length) return;
-      const take = Math.min(5, q.length);
-      const chars = q.slice(0, take);
-      twQueueRef.current = q.slice(take);
-      setMessages(prev => {
-        const next = [...prev];
-        const last = next[next.length - 1];
-        if (last?.streaming) next[next.length - 1] = { ...last, content: last.content + chars };
-        return next;
-      });
-    }, 16);
+  // Aplica chunk de streaming imediatamente no estado de mensagens
+  const applyChunk = useCallback((text: string) => {
+    setMessages(prev => {
+      const next = [...prev];
+      const last = next[next.length - 1];
+      if (last?.streaming) next[next.length - 1] = { ...last, content: last.content + text };
+      return next;
+    });
   }, []);
 
-  const flushTypewriter = useCallback(() => {
-    if (twTimerRef.current) { clearInterval(twTimerRef.current); twTimerRef.current = null; }
-    const remaining = twQueueRef.current;
-    twQueueRef.current = '';
-    if (remaining) {
-      setMessages(prev => {
-        const next = [...prev];
-        const last = next[next.length - 1];
-        if (last?.streaming) next[next.length - 1] = { ...last, content: last.content + remaining };
-        return next;
-      });
-    }
-  }, []);
+  // Compatibilidade: flush é no-op agora que aplicamos direto
+  const flushTypewriter = useCallback(() => {}, []);
 
   // Sincroniza refs com estados
   useEffect(() => { messagesRef.current = messages; }, [messages]);
@@ -278,8 +256,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 return next;
               });
             } else if (parsed.text) {
-              twQueueRef.current += parsed.text;
-              startTypewriter();
+              applyChunk(parsed.text);
             }
           } catch { /* skip malformed */ }
         }
