@@ -272,7 +272,7 @@ export function BuddyMode({ onNavigate }: Props) {
           <div style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             {isDragon && bones ? (
               <DragonBuddy
-                size={hasMessages ? 220 : 320}
+                size={hasMessages ? 220 : 400}
                 mood={mood}
                 isMoving={petState === 'roaming'}
                 forceAnim={forceAnim}
@@ -282,7 +282,7 @@ export function BuddyMode({ onNavigate }: Props) {
               <BuddySprite
                 bones={bones}
                 frame={frame}
-                size={hasMessages ? 180 : 256}
+                size={hasMessages ? 180 : 320}
                 expression={petState === 'sleeping' ? 'sleepy' : petState === 'reacting' ? 'excited' : 'happy'}
               />
             ) : null}
@@ -397,6 +397,7 @@ const mainContentStyle: React.CSSProperties = {
   overflow: 'hidden',
   position: 'relative',
   zIndex: 5,
+  // pet column usa overflow:visible para a animação especial não ser cortada
 };
 
 // Painel de chat (esquerda quando há mensagens)
