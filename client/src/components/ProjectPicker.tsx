@@ -13,11 +13,12 @@ interface DirEntry {
 
 interface Props {
   onClose: () => void;
-  onSelect: (dir: string | null) => void;
-  currentDir: string | null;
+  onAdd: (dir: string) => void;
+  onRemove: (dir: string) => void;
+  currentDirs: string[];
 }
 
-export function ProjectPicker({ onClose, onSelect, currentDir }: Props) {
+export function ProjectPicker({ onClose, onAdd, onRemove, currentDirs }: Props) {
   const [browsePath, setBrowsePath] = useState<string>('');
   const [entries, setEntries] = useState<DirEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -39,36 +40,12 @@ export function ProjectPicker({ onClose, onSelect, currentDir }: Props) {
     }
   }, []);
 
-  // Carrega home na abertura
-  useEffect(() => {
-    void browse('');
-  }, [browse]);
+  useEffect(() => { void browse(''); }, [browse]);
 
-  const handleSelect = useCallback(async (dir: string) => {
-    try {
-      const res = await fetch('/api/project', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dir }),
-      });
-      const data = await res.json() as { ok?: boolean; error?: string };
-      if (data.error) { setError(data.error); return; }
-      onSelect(dir);
-      onClose();
-    } catch {
-      setError('Erro ao salvar projeto');
-    }
-  }, [onSelect, onClose]);
-
-  const handleClear = useCallback(async () => {
-    await fetch('/api/project', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dir: null }),
-    }).catch(() => {});
-    onSelect(null);
+  const handleAdd = useCallback((dir: string) => {
+    onAdd(dir);
     onClose();
-  }, [onSelect, onClose]);
+  }, [onAdd, onClose]);
 
   const goUp = useCallback(() => {
     const parts = browsePath.split('/').filter(Boolean);
@@ -77,13 +54,38 @@ export function ProjectPicker({ onClose, onSelect, currentDir }: Props) {
     void browse(parent);
   }, [browsePath, browse]);
 
+  const alreadyAdded = browsePath ? currentDirs.includes(browsePath) : false;
+
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={e => e.stopPropagation()}>
         <div style={headerStyle}>
-          <span style={titleStyle}>📁 Escolher projeto</span>
+          <span style={titleStyle}>📁 Pastas de contexto</span>
           <button onClick={onClose} style={closeBtnStyle}>✕</button>
         </div>
+
+        {/* Pastas já adicionadas */}
+        {currentDirs.length > 0 && (
+          <div style={addedSectionStyle}>
+            <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#556', marginBottom: 4, display: 'block' }}>
+              pastas ativas:
+            </span>
+            {currentDirs.map(dir => (
+              <div key={dir} style={addedChipStyle}>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: 11, color: '#6db87a' }}>
+                  {dir}
+                </span>
+                <button
+                  onClick={() => onRemove(dir)}
+                  style={{ background: 'none', border: 'none', color: '#4a6a4a', cursor: 'pointer', padding: '0 0 0 6px', fontSize: 13, lineHeight: 1, flexShrink: 0 }}
+                  title={`Remover ${dir}`}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Breadcrumb / caminho atual */}
         <div style={pathBarStyle}>
@@ -97,23 +99,21 @@ export function ProjectPicker({ onClose, onSelect, currentDir }: Props) {
           </div>
         )}
 
-        {/* Usar pasta atual */}
+        {/* Adicionar pasta atual */}
         <div style={useCurrentStyle}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#888' }}>
-              pasta atual:
-            </span>
+            <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#888' }}>navegar:</span>
             <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#aac', marginLeft: 6, wordBreak: 'break-all' }}>
               {browsePath || '~'}
             </span>
           </div>
           <button
-            onClick={() => browsePath ? void handleSelect(browsePath) : undefined}
-            disabled={!browsePath}
-            style={currentSelectBtnStyle(!browsePath)}
-            title="Usar esta pasta como contexto do projeto"
+            onClick={() => browsePath && !alreadyAdded ? handleAdd(browsePath) : undefined}
+            disabled={!browsePath || alreadyAdded}
+            style={currentSelectBtnStyle(!browsePath || alreadyAdded)}
+            title={alreadyAdded ? 'Já adicionada' : 'Adicionar esta pasta ao contexto'}
           >
-            ✓ usar esta pasta
+            {alreadyAdded ? '✓ adicionada' : '+ adicionar'}
           </button>
         </div>
 
@@ -124,40 +124,30 @@ export function ProjectPicker({ onClose, onSelect, currentDir }: Props) {
           ) : entries.length === 0 ? (
             <div style={loadingStyle}>nenhuma subpasta aqui</div>
           ) : (
-            entries.map(e => (
-              <div key={e.path} style={entryRowStyle}>
-                <button
-                  onClick={() => void browse(e.path)}
-                  style={entryBtnStyle(false)}
-                  title={`Abrir ${e.name}`}
-                >
-                  <span style={{ marginRight: 6, opacity: 0.7 }}>📁</span>
-                  {e.name}
-                  <span style={{ marginLeft: 'auto', fontSize: 10, color: '#444', paddingLeft: 8 }}>abrir →</span>
-                </button>
-                <button
-                  onClick={() => void handleSelect(e.path)}
-                  style={selectBtnStyle}
-                  title={`Usar ${e.name} como contexto`}
-                >
-                  ✓
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Footer */}
-        <div style={footerStyle}>
-          {currentDir && (
-            <div style={{ width: '100%', fontSize: 11, color: '#666', marginBottom: 8, fontFamily: 'monospace' }}>
-              atual: {currentDir}
-            </div>
-          )}
-          {currentDir && (
-            <button onClick={handleClear} style={clearBtnStyle}>
-              ✕ remover projeto
-            </button>
+            entries.map(e => {
+              const isAdded = currentDirs.includes(e.path);
+              return (
+                <div key={e.path} style={entryRowStyle}>
+                  <button
+                    onClick={() => void browse(e.path)}
+                    style={entryBtnStyle(isAdded)}
+                    title={`Abrir ${e.name}`}
+                  >
+                    <span style={{ marginRight: 6, opacity: 0.7 }}>📁</span>
+                    {e.name}
+                    {isAdded && <span style={{ marginLeft: 6, fontSize: 10, color: '#6db87a' }}>✓</span>}
+                    <span style={{ marginLeft: 'auto', fontSize: 10, color: '#444', paddingLeft: 8 }}>abrir →</span>
+                  </button>
+                  <button
+                    onClick={() => isAdded ? onRemove(e.path) : handleAdd(e.path)}
+                    style={isAdded ? removeBtnStyle : selectBtnStyle}
+                    title={isAdded ? `Remover ${e.name}` : `Adicionar ${e.name} ao contexto`}
+                  >
+                    {isAdded ? '✕' : '+'}
+                  </button>
+                </div>
+              );
+            })
           )}
         </div>
       </div>
@@ -268,12 +258,12 @@ const entryRowStyle: React.CSSProperties = {
   borderBottom: '1px solid rgba(30,30,60,0.4)',
 };
 
-function entryBtnStyle(_active: boolean): React.CSSProperties {
+function entryBtnStyle(active: boolean): React.CSSProperties {
   return {
     flex: 1,
-    background: 'none',
+    background: active ? 'rgba(30,60,30,0.25)' : 'none',
     border: 'none',
-    color: '#bbb',
+    color: active ? '#6db87a' : '#bbb',
     cursor: 'pointer',
     padding: '9px 14px',
     textAlign: 'left',
@@ -293,19 +283,23 @@ const selectBtnStyle: React.CSSProperties = {
   borderLeft: '1px solid rgba(40,80,40,0.4)',
   color: '#7a7',
   cursor: 'pointer',
-  padding: '9px 12px',
+  padding: '9px 14px',
   fontFamily: 'sans-serif',
-  fontSize: 11,
+  fontSize: 14,
+  fontWeight: 700,
   flexShrink: 0,
 };
 
-const footerStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 8,
-  padding: '10px 12px',
-  borderTop: '1px solid rgba(40,40,80,0.4)',
-  background: 'rgba(10,10,30,0.6)',
-  flexWrap: 'wrap',
+const removeBtnStyle: React.CSSProperties = {
+  background: 'rgba(60,20,20,0.5)',
+  border: 'none',
+  borderLeft: '1px solid rgba(80,40,40,0.4)',
+  color: '#a77',
+  cursor: 'pointer',
+  padding: '9px 14px',
+  fontFamily: 'sans-serif',
+  fontSize: 13,
+  flexShrink: 0,
 };
 
 const currentSelectBtnStyle = (disabled: boolean): React.CSSProperties => ({
@@ -321,12 +315,18 @@ const currentSelectBtnStyle = (disabled: boolean): React.CSSProperties => ({
   whiteSpace: 'nowrap',
 });
 
-const clearBtnStyle: React.CSSProperties = {
+const addedSectionStyle: React.CSSProperties = {
   padding: '8px 12px',
-  background: 'rgba(60,20,20,0.6)',
-  border: '1px solid rgba(100,40,40,0.4)',
-  color: '#a77',
-  cursor: 'pointer',
-  fontFamily: 'sans-serif',
-  fontSize: 12,
+  background: 'rgba(20,40,20,0.4)',
+  borderBottom: '1px solid rgba(60,120,60,0.25)',
+};
+
+const addedChipStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  padding: '4px 8px',
+  background: 'rgba(30,60,30,0.5)',
+  border: '1px solid rgba(60,100,60,0.4)',
+  marginTop: 4,
 };

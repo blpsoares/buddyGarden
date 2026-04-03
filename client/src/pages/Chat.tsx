@@ -66,7 +66,7 @@ export function Chat() {
     approveCommand, denyCommand,
     conversationId, isAnonymous, conversations,
     loadConversation, newConversation, removeConversation, setIsAnonymous,
-    setConvProjectDir, activeConvMeta,
+    addConvProjectDir, removeConvProjectDir, activeConvMeta, activeConvProjectDirs,
     lang, setLang,
   } = useChat();
   const tl = useT();
@@ -100,9 +100,8 @@ export function Chat() {
   const [currentModel, setCurrentModel] = useState<ClaudeModel>('claude-haiku-4-5');
   const [hasApiKey, setHasApiKey] = useState(false);
 
-  // Project context — per-conversation
+  // Project context — per-conversation (múltiplas pastas)
   const [showProjectPicker, setShowProjectPicker] = useState(false);
-  const projectDir = activeConvMeta?.projectDir ?? null;
 
   useEffect(() => {
     const t = setInterval(() => setFrame(f => (f + 1) % 3), 400);
@@ -339,37 +338,51 @@ export function Chat() {
               </span>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
             {/* Ícone read-only: mostra onde o contexto está salvo (Buddy Garden ou Claude Code) */}
             <img
               src={activeConvMeta?.forkedSessionId ? claudeChatIcon : gardenChatIcon}
               alt={activeConvMeta?.forkedSessionId ? 'Claude Code' : 'Buddy Garden'}
               title={activeConvMeta?.forkedSessionId
                 ? `Forked para Claude · ${activeConvMeta.forkedProjectDir ?? ''}`
-                : projectDir ? `Buddy Garden · ${projectDir}` : 'Buddy Garden'}
+                : activeConvProjectDirs.length ? `Buddy Garden · ${activeConvProjectDirs.join(', ')}` : 'Buddy Garden'}
               style={{ width: 20, height: 20, imageRendering: 'pixelated', opacity: 0.75, flexShrink: 0 }}
             />
-            {/* Botão de workspace — abre o seletor de pasta */}
+            {/* Chips de pastas de contexto */}
+            {activeConvProjectDirs.map(dir => (
+              <div
+                key={dir}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 3,
+                  background: '#0d1a0d', border: '1px solid #2a4a2a',
+                  padding: '2px 6px', fontSize: 11, color: '#6db87a',
+                }}
+                title={dir}
+              >
+                <span style={{ maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  📁 {dir.split('/').pop()}
+                </span>
+                <button
+                  onClick={() => void removeConvProjectDir(dir)}
+                  style={{ background: 'none', border: 'none', color: '#4a7a4a', cursor: 'pointer', padding: '0 0 0 2px', fontSize: 12, lineHeight: 1 }}
+                  title={`Remover ${dir}`}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            {/* Botão para adicionar pasta */}
             <button
               onClick={() => setShowProjectPicker(true)}
               style={{
                 ...iconBtnStyle,
-                display: 'flex', alignItems: 'center', gap: 4,
-                color: projectDir ? '#6db87a' : '#555',
-                fontSize: 13,
-                border: `1px solid ${projectDir ? '#2a4a2a' : '#222'}`,
-                padding: '3px 8px',
-                background: projectDir ? '#0d1a0d' : 'transparent',
+                display: 'flex', alignItems: 'center', gap: 3,
+                color: '#555', fontSize: 12,
+                border: '1px solid #222', padding: '3px 7px',
               }}
-              title={projectDir ? `Workspace: ${projectDir}` : tl('chatProjectBtn')}
+              title={tl('chatProjectBtn')}
             >
-              📁
-              {projectDir
-                ? <span style={{ maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>
-                    {projectDir.split('/').pop()}
-                  </span>
-                : <span style={{ fontSize: 11, color: '#555' }}>pasta</span>
-              }
+              📁 <span style={{ fontSize: 11 }}>+</span>
             </button>
             <button
               onClick={() => setLang(lang === 'pt' ? 'en' : 'pt')}
@@ -525,11 +538,7 @@ export function Chat() {
                 {tl('chatAnonBadge')}
               </span>
             )}
-            {projectDir && (
-              <span style={{ fontSize: '11px', color: '#6db87a' }}>
-                📁 {projectDir.split('/').pop()}
-              </span>
-            )}
+
             <button
               onClick={clear}
               style={{ marginLeft: 'auto', ...iconBtnStyle, color: '#ff5555', fontSize: 12 }}
@@ -630,9 +639,10 @@ export function Chat() {
       {/* Project picker modal */}
       {showProjectPicker && (
         <ProjectPicker
-          currentDir={projectDir}
+          currentDirs={activeConvProjectDirs}
           onClose={() => setShowProjectPicker(false)}
-          onSelect={dir => { void setConvProjectDir(dir); }}
+          onAdd={dir => { void addConvProjectDir(dir); }}
+          onRemove={dir => { void removeConvProjectDir(dir); }}
         />
       )}
     </div>

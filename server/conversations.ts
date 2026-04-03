@@ -3,19 +3,6 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 
-const CONFIG_PATH = join(homedir(), '.buddy-garden', 'config.json');
-
-function readDefaultProjectDir(): string | null {
-  try {
-    if (existsSync(CONFIG_PATH)) {
-      const cfg = JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>;
-      const dir = cfg['projectDir'] as string | undefined;
-      if (dir && existsSync(dir)) return dir;
-    }
-  } catch { /* ignore */ }
-  return null;
-}
-
 const GARDEN_DIR = join(homedir(), '.buddy-garden');
 const CONV_DIR = join(GARDEN_DIR, 'conversations');
 const INDEX_PATH = join(CONV_DIR, 'index.json');
@@ -26,9 +13,18 @@ export interface ConversationMeta {
   createdAt: number;
   updatedAt: number;
   messageCount: number;
-  projectDir?: string;        // pasta de contexto desta conversa
+  projectDirs?: string[];     // pastas de contexto desta conversa (múltiplas)
+  projectDir?: string;        // DEPRECATED: mantido para compat com dados antigos
   forkedSessionId?: string;   // se fork para Claude: sessionId
   forkedProjectDir?: string;  // se fork para Claude: cwd do projeto
+}
+
+/** Retorna as pastas de contexto de uma conversa, migrando o campo antigo se necessário. */
+export function getConversationProjectDirs(meta: ConversationMeta | null): string[] {
+  if (!meta) return [];
+  if (meta.projectDirs?.length) return meta.projectDirs;
+  if (meta.projectDir) return [meta.projectDir]; // migração de dados antigos
+  return [];
 }
 
 export interface ConversationMessage {
@@ -72,16 +68,15 @@ export function getConversation(id: string): ConversationMessage[] {
     .map(line => JSON.parse(line) as ConversationMessage);
 }
 
-export function createConversation(firstMessage: string, projectDir?: string | null): ConversationMeta {
+export function createConversation(firstMessage: string, projectDirs?: string[]): ConversationMeta {
   ensureDir();
   const id = randomUUID();
   const now = Date.now();
   const title = firstMessage.length > 60 ? firstMessage.slice(0, 57) + '...' : firstMessage;
-  // Se não foi passado projectDir explícito, usa o default global
-  const resolvedDir = projectDir !== undefined ? projectDir : readDefaultProjectDir();
+  const validDirs = (projectDirs ?? []).filter(d => existsSync(d));
   const meta: ConversationMeta = {
     id, title, createdAt: now, updatedAt: now, messageCount: 0,
-    ...(resolvedDir ? { projectDir: resolvedDir } : {}),
+    ...(validDirs.length ? { projectDirs: validDirs } : {}),
   };
   const index = readIndex();
   index.unshift(meta);
@@ -116,12 +111,18 @@ export function renameConversation(id: string, title: string) {
   if (meta) { meta.title = title; writeIndex(index); }
 }
 
-export function setConversationProjectDir(id: string, dir: string | null) {
+export function setConversationProjectDirs(id: string, dirs: string[]) {
   const index = readIndex();
   const meta = index.find(m => m.id === id);
   if (!meta) return;
-  if (dir) meta.projectDir = dir;
-  else delete meta.projectDir;
+  const validDirs = dirs.filter(d => existsSync(d));
+  if (validDirs.length > 0) {
+    meta.projectDirs = validDirs;
+  } else {
+    delete meta.projectDirs;
+  }
+  delete meta.projectDir; // migra campo legado
+  meta.updatedAt = Date.now();
   writeIndex(index);
 }
 

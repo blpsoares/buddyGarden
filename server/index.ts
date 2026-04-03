@@ -17,7 +17,8 @@ import {
   appendMessages,
   deleteConversation,
   renameConversation,
-  setConversationProjectDir,
+  setConversationProjectDirs,
+  getConversationProjectDirs,
   exportConversationToFile,
 } from './conversations.ts';
 
@@ -156,17 +157,17 @@ Bun.serve({
     }
 
     if (url.pathname === '/api/conversations' && req.method === 'POST') {
-      type CreateBody = { firstMessage: string; projectDir?: string | null };
+      type CreateBody = { firstMessage: string; projectDirs?: string[] };
       const body = (await req.json()) as CreateBody;
       if (!body.firstMessage?.trim()) return json({ error: 'firstMessage obrigatório' }, 400);
-      return json(createConversation(body.firstMessage.trim(), body.projectDir));
+      return json(createConversation(body.firstMessage.trim(), body.projectDirs));
     }
 
     const convMatch = url.pathname.match(/^\/api\/conversations\/([^/]+)$/);
     if (convMatch) {
       const id = convMatch[1]!;
       if (req.method === 'GET') {
-        // Retorna messages + meta (projectDir, forkedSessionId)
+        // Retorna messages + meta (projectDirs, forkedSessionId)
         const messages = getConversation(id);
         const meta = getConversationMeta(id);
         return json({ messages, meta });
@@ -176,9 +177,9 @@ Bun.serve({
         return json({ ok: true });
       }
       if (req.method === 'PATCH') {
-        const body = (await req.json()) as { title?: string; projectDir?: string | null };
+        const body = (await req.json()) as { title?: string; projectDirs?: string[] };
         if (body.title) renameConversation(id, body.title.trim());
-        if ('projectDir' in body) setConversationProjectDir(id, body.projectDir ?? null);
+        if ('projectDirs' in body) setConversationProjectDirs(id, body.projectDirs ?? []);
         return json({ ok: true });
       }
     }
@@ -249,23 +250,15 @@ Bun.serve({
       const bones = userId ? generateBones(userId) : generateBones('anonymous');
       const stats = computeSessionStats();
 
-      // Project context — usa projectDir da conversa específica (fallback: config global)
+      // Project context — usa projectDirs da conversa (múltiplas pastas)
       let projectContextStr: string | undefined;
       try {
-        let projectDir: string | undefined;
-        if (conversationId) {
-          const convMeta = getConversationMeta(conversationId);
-          projectDir = convMeta?.projectDir;
-        }
-        if (!projectDir) {
-          const cfg = existsSync(CONFIG_PATH)
-            ? JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>
-            : {};
-          projectDir = cfg['projectDir'] as string | undefined;
-        }
-        if (projectDir && existsSync(projectDir)) {
-          const ctx = await buildProjectContext(projectDir);
-          projectContextStr = ctx.summary;
+        const convMeta = conversationId ? getConversationMeta(conversationId) : null;
+        const projectDirs = getConversationProjectDirs(convMeta);
+        const validDirs = projectDirs.filter(d => existsSync(d));
+        if (validDirs.length > 0) {
+          const contexts = await Promise.all(validDirs.map(d => buildProjectContext(d)));
+          projectContextStr = contexts.map(c => c.summary).join('\n\n---\n\n');
         }
       } catch { /* projeto opcional, nunca bloqueia o chat */ }
 

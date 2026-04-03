@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"bun run server/index.ts\" \"bunx vite --config vite.config.ts --port 5173\"",
+    "dev": "concurrently \"bun --watch run server/index.ts\" \"bunx vite --config vite.config.ts --port 5173\"",
     "build": "bunx vite build --config vite.config.ts",
     "start": "bun run server/index.ts",
     "chat": "bun run cli/chat.ts"
