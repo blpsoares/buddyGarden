@@ -1,11 +1,15 @@
 /**
- * BuddyMode — modo "Pou": pet centralizado, grande, com máquina de estados completa.
+ * BuddyMode — modo "Pou": pet + chat lado a lado.
+ *
+ * Layout:
+ *   - Sem mensagens: pet centralizado na tela inteira
+ *   - Com mensagens: chat scroll à esquerda | pet fixo à direita
  *
  * Estados do dragão:
- *   idle     → breathe loop (idle atlas, frames 0-8, 8fps)
- *   roaming  → walk loop 2x (walk atlas, frames 0-8, 10fps) → idle
- *   reacting → fire breath once (special atlas, frames 0-8, 12fps) → idle
- *   sleeping → sleep loop (sleep atlas, frames 0-8, 4fps)
+ *   idle     → breathe loop (idle atlas, 8fps)
+ *   roaming  → walk loop 2x (walk atlas, 10fps) → idle
+ *   reacting → fire breath once (special atlas, 12fps) → idle
+ *   sleeping → sleep loop (sleep atlas, 4fps)
  *
  * Transições:
  *   idle     → reacting  : clique no pet
@@ -23,6 +27,7 @@ import { DragonBuddy, type DragonAnim } from '../components/DragonBuddy.tsx';
 import { BuddySprite } from '../components/BuddySprite.tsx';
 import { DragonNightBackground } from '../backgrounds/DragonBackground.tsx';
 import { RarityBadge } from '../components/RarityBadge.tsx';
+import { MarkdownRenderer } from '../components/MarkdownRenderer.tsx';
 import { useT } from '../hooks/useT.ts';
 import type { Page } from '../App.tsx';
 
@@ -47,8 +52,9 @@ export function BuddyMode({ onNavigate }: Props) {
   const [petState, setPetState] = useState<PetState>('idle');
   const [mood, setMood] = useState('happy');
   const [input, setInput] = useState('');
-  const [frame, setFrame] = useState(0); // for non-dragon sprite
+  const [frame, setFrame] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const roamLoopRef = useRef(0);
 
   // WebSocket mood
@@ -95,7 +101,18 @@ export function BuddyMode({ onNavigate }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-foco no input ao montar
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  // Scroll para o fim quando chegar nova mensagem
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   const handlePetClick = useCallback(() => {
+    inputRef.current?.focus();
     if (petState === 'sleeping') {
       setPetState('idle');
       return;
@@ -115,7 +132,6 @@ export function BuddyMode({ onNavigate }: Props) {
       if (roamLoopRef.current >= 2) {
         setPetState('idle');
       } else {
-        // força re-trigger do walk reiniciando estado
         setPetState('idle');
         setTimeout(() => setPetState('roaming'), 50);
       }
@@ -128,6 +144,8 @@ export function BuddyMode({ onNavigate }: Props) {
     if (!text || isStreaming) return;
     setInput('');
     void send(text);
+    // Re-foca após envio
+    setTimeout(() => inputRef.current?.focus(), 0);
   }, [input, isStreaming, send]);
 
   if (!data.bones && !data.soul) {
@@ -145,15 +163,13 @@ export function BuddyMode({ onNavigate }: Props) {
   const isDragon = bones?.species === 'dragon';
   const petName = soul?.name ?? bones?.species ?? 'Buddy';
 
-  // Mapeamento estado → animação dragon
   const forceAnim: DragonAnim =
     petState === 'sleeping'  ? 'sleep'   :
     petState === 'roaming'   ? 'walk'    :
     petState === 'reacting'  ? 'special' :
     'idle';
 
-  // Últimas 3 mensagens visíveis para chat bubbles
-  const recentMsgs = messages.slice(-3);
+  const hasMessages = messages.length > 0;
 
   return (
     <div style={containerStyle}>
@@ -166,16 +182,13 @@ export function BuddyMode({ onNavigate }: Props) {
 
       {/* ── HUD top ── */}
       <div style={hudTopStyle}>
-        {/* Modo toggle */}
         <button onClick={() => onNavigate('garden')} style={modeToggleBtn} title="Voltar ao jardim">
           🌱
         </button>
-        {/* Nome + raridade */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
           <span style={pixelText(9)}>{petName}</span>
           {bones && <RarityBadge rarity={bones.rarity} />}
         </div>
-        {/* Mood + level */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
           <span style={{ fontFamily: 'sans-serif', fontSize: 11, color: '#aaa' }}>
             {MOOD_EMOJI[mood] ?? '😊'} {mood}
@@ -186,70 +199,110 @@ export function BuddyMode({ onNavigate }: Props) {
         </div>
       </div>
 
-      {/* ── Chat bubbles (acima do pet) ── */}
-      <div style={bubblesContainerStyle}>
-        {recentMsgs.map((msg, i) => (
-          <div
-            key={i}
-            style={{
-              ...bubbleStyle,
-              alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-              background: msg.role === 'user'
-                ? 'rgba(55,55,140,0.92)'
-                : 'rgba(14,14,40,0.92)',
-              border: `1px solid ${msg.role === 'user' ? 'rgba(100,100,200,0.5)' : 'rgba(60,60,120,0.4)'}`,
-              opacity: i < recentMsgs.length - 2 ? 0.55 : i === recentMsgs.length - 2 ? 0.75 : 1,
-            }}
-          >
-            {msg.role === 'assistant' && (
-              <span style={{ fontFamily: '"Press Start 2P",monospace', fontSize: 7, color: '#6666cc', marginRight: 5 }}>
-                {petName}
-              </span>
+      {/* ── Conteúdo principal ── */}
+      <div style={mainContentStyle}>
+        {/* Chat (visível quando há mensagens) */}
+        {hasMessages && (
+          <div style={chatPanelStyle}>
+            <div style={messagesListStyle}>
+              {messages.map((msg, i) => (
+                <div
+                  key={i}
+                  style={{
+                    ...msgRowStyle,
+                    justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                  }}
+                >
+                  {msg.role === 'assistant' && (
+                    <div style={avatarStyle}>
+                      {isDragon && bones ? (
+                        <DragonBuddy size={28} mood={mood} forceAnim="idle" />
+                      ) : bones ? (
+                        <BuddySprite bones={bones} frame={frame} size={28} expression="happy" />
+                      ) : (
+                        <span style={{ fontSize: 18 }}>🐾</span>
+                      )}
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      ...bubbleStyle,
+                      background: msg.role === 'user'
+                        ? 'rgba(55,55,140,0.92)'
+                        : 'rgba(14,14,40,0.92)',
+                      border: `1px solid ${msg.role === 'user' ? 'rgba(100,100,200,0.5)' : 'rgba(60,60,120,0.4)'}`,
+                      alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                    }}
+                  >
+                    {msg.role === 'assistant' && (
+                      <span style={{ fontFamily: '"Press Start 2P",monospace', fontSize: 7, color: '#6666cc', display: 'block', marginBottom: 4 }}>
+                        {petName}
+                      </span>
+                    )}
+                    {msg.role === 'assistant' ? (
+                      <MarkdownRenderer
+                        content={msg.content}
+                        streaming={msg.streaming}
+                        style={{ fontSize: 13, lineHeight: 1.5 }}
+                      />
+                    ) : (
+                      <span style={{ fontFamily: 'sans-serif', fontSize: 13, color: '#eee', lineHeight: 1.5 }}>
+                        {msg.content}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+        )}
+
+        {/* Pet */}
+        <div
+          style={{
+            ...petAreaStyle,
+            flex: hasMessages ? '0 0 auto' : '1',
+            alignItems: hasMessages ? 'flex-end' : 'center',
+            justifyContent: hasMessages ? 'flex-end' : 'center',
+            paddingBottom: hasMessages ? '0' : '60px',
+          }}
+          onClick={handlePetClick}
+        >
+          <div style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {isDragon && bones ? (
+              <DragonBuddy
+                size={hasMessages ? 220 : 320}
+                mood={mood}
+                isMoving={petState === 'roaming'}
+                forceAnim={forceAnim}
+                onAnimEnd={handleAnimEnd}
+              />
+            ) : bones ? (
+              <BuddySprite
+                bones={bones}
+                frame={frame}
+                size={hasMessages ? 180 : 256}
+                expression={petState === 'sleeping' ? 'sleepy' : petState === 'reacting' ? 'excited' : 'happy'}
+              />
+            ) : null}
+
+            {petState === 'sleeping' && (
+              <div style={{ textAlign: 'center', marginTop: 6 }}>
+                <span style={{ fontSize: 20, animation: 'float 2s ease-in-out infinite' }}>💤</span>
+              </div>
             )}
-            <span style={{ fontFamily: 'sans-serif', fontSize: 12, color: '#eee', lineHeight: 1.45 }}>
-              {msg.content.slice(0, 100)}{msg.content.length > 100 ? '…' : ''}
-              {msg.streaming && <span style={{ marginLeft: 3, animation: 'blink 1s infinite' }}>▌</span>}
-            </span>
+            {petState === 'reacting' && (
+              <div style={{ textAlign: 'center', marginTop: 6 }}>
+                <span style={{ fontSize: 20 }}>🔥</span>
+              </div>
+            )}
           </div>
-        ))}
-      </div>
-
-      {/* ── Pet centralizado ── */}
-      <div style={petWrapStyle} onClick={handlePetClick}>
-        <div style={{ cursor: 'pointer' }}>
-          {isDragon && bones ? (
-            <DragonBuddy
-              size={320}
-              mood={mood}
-              isMoving={petState === 'roaming'}
-              forceAnim={forceAnim}
-              onAnimEnd={handleAnimEnd}
-            />
-          ) : bones ? (
-            <BuddySprite
-              bones={bones}
-              frame={frame}
-              size={256}
-              expression={petState === 'sleeping' ? 'sleepy' : petState === 'reacting' ? 'excited' : 'happy'}
-            />
-          ) : null}
         </div>
-
-        {/* Estado indicator abaixo do pet */}
-        {petState === 'sleeping' && (
-          <div style={{ textAlign: 'center', marginTop: 8 }}>
-            <span style={{ fontSize: 20, animation: 'float 2s ease-in-out infinite' }}>💤</span>
-          </div>
-        )}
-        {petState === 'reacting' && (
-          <div style={{ textAlign: 'center', marginTop: 8 }}>
-            <span style={{ fontSize: 20 }}>🔥</span>
-          </div>
-        )}
       </div>
 
-      {/* ── Hint de clique ── */}
-      {messages.length === 0 && petState === 'idle' && (
+      {/* ── Hint quando sem mensagens ── */}
+      {!hasMessages && petState === 'idle' && (
         <div style={hintStyle}>
           <span style={{ fontFamily: 'sans-serif', fontSize: 11, color: '#444' }}>
             {lang === 'pt' ? 'clique no pet ou envie uma mensagem' : 'click the pet or send a message'}
@@ -282,7 +335,7 @@ export function BuddyMode({ onNavigate }: Props) {
           type="button"
           onClick={() => onNavigate('chat')}
           style={{ ...sendBtnStyle(false), background: 'rgba(30,30,70,0.9)', borderColor: 'rgba(80,80,180,0.4)', fontSize: 13 }}
-          title={tl('chatFullscreen') ?? 'fullscreen'}
+          title={tl('chatFullscreen')}
         >
           ⛶
         </button>
@@ -323,6 +376,7 @@ const hudTopStyle: React.CSSProperties = {
   background: 'rgba(0,0,0,0.55)',
   backdropFilter: 'blur(4px)',
   borderBottom: '1px solid rgba(80,80,180,0.2)',
+  flexShrink: 0,
 };
 
 const modeToggleBtn: React.CSSProperties = {
@@ -335,17 +389,48 @@ const modeToggleBtn: React.CSSProperties = {
   boxShadow: '2px 2px 0 rgba(0,0,0,0.5)',
 };
 
-const bubblesContainerStyle: React.CSSProperties = {
-  position: 'absolute',
-  zIndex: 20,
-  top: '14%',
-  left: '50%',
-  transform: 'translateX(-50%)',
-  width: 'min(500px, 90%)',
+// Área abaixo do HUD, acima do input bar
+const mainContentStyle: React.CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'row',
+  overflow: 'hidden',
+  position: 'relative',
+  zIndex: 5,
+};
+
+// Painel de chat (esquerda quando há mensagens)
+const chatPanelStyle: React.CSSProperties = {
+  flex: 1,
   display: 'flex',
   flexDirection: 'column',
+  overflow: 'hidden',
+  minWidth: 0,
+};
+
+const messagesListStyle: React.CSSProperties = {
+  flex: 1,
+  overflowY: 'auto',
+  padding: '12px 14px 8px 14px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10,
+};
+
+const msgRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
   gap: 8,
-  pointerEvents: 'none',
+};
+
+const avatarStyle: React.CSSProperties = {
+  flexShrink: 0,
+  width: 32,
+  height: 32,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'visible',
 };
 
 const bubbleStyle: React.CSSProperties = {
@@ -355,38 +440,34 @@ const bubbleStyle: React.CSSProperties = {
   wordBreak: 'break-word',
 };
 
-const petWrapStyle: React.CSSProperties = {
-  position: 'absolute',
-  zIndex: 15,
-  bottom: '18%',
-  left: '50%',
-  transform: 'translateX(-50%)',
+// Área do pet (direita com mensagens, centralizado sem)
+const petAreaStyle: React.CSSProperties = {
   display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
+  flexShrink: 0,
+  padding: '12px 16px',
+  cursor: 'pointer',
+  overflow: 'visible',
 };
 
 const hintStyle: React.CSSProperties = {
   position: 'absolute',
   zIndex: 10,
-  bottom: '16%',
+  bottom: '80px',
   left: '50%',
   transform: 'translateX(-50%)',
   whiteSpace: 'nowrap',
 };
 
 const inputBarStyle: React.CSSProperties = {
-  position: 'absolute',
+  position: 'relative',
   zIndex: 20,
-  bottom: 0,
-  left: 0,
-  right: 0,
   display: 'flex',
   gap: 8,
   padding: '10px 14px',
   background: 'rgba(5,5,18,0.85)',
   backdropFilter: 'blur(8px)',
   borderTop: '1px solid rgba(60,60,120,0.35)',
+  flexShrink: 0,
 };
 
 const inputStyle: React.CSSProperties = {
