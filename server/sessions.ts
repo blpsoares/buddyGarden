@@ -87,10 +87,18 @@ function getClaudeProjectsDir(): string {
   return join(homedir(), '.claude', 'projects');
 }
 
+// Claude Code nomeia os diretórios de projeto substituindo '/' e '.' por '-'
+// Ex: /home/user/.buddy-garden/tmp → -home-user--buddy-garden-tmp
+// Excluímos esse dir para não contar as chamadas internas do buddy como sessões do usuário.
+function getBuddyTmpDirName(): string {
+  return join(homedir(), '.buddy-garden', 'tmp').replace(/[/.]/g, '-');
+}
+
 function scanLogs(): { sessions: Map<string, string>; totalTokens: number } {
   const projectsDir = getClaudeProjectsDir();
   const sessions = new Map<string, string>(); // sessionId → date (YYYY-MM-DD)
   let totalTokens = 0;
+  const buddyTmpDir = getBuddyTmpDirName();
 
   if (!existsSync(projectsDir)) return { sessions, totalTokens };
 
@@ -100,6 +108,7 @@ function scanLogs(): { sessions: Map<string, string>; totalTokens: number } {
       for (const entry of entries) {
         const fullPath = join(dir, entry.name);
         if (entry.isDirectory()) {
+          if (entry.name === buddyTmpDir) continue; // ignora sessões internas do buddy
           scanDir(fullPath);
         } else if (entry.isFile() && entry.name.endsWith('.jsonl')) {
           try {
