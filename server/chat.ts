@@ -78,14 +78,13 @@ Stats que definem como você age:
 - Sabedoria ${s.wisdom}/100 | Sarcasmo ${s.snark}/100
 - Ponto forte: ${peak} | Ponto fraco: ${dump}
 
-Contexto do dono: ${stats.total} sessões de código, ${stats.today} hoje, ${stats.streak} dias de streak.
 ${recentActivity}
 ${hat !== 'none' ? `Você usa um chapéu ${hat}.` : ''}${isShiny ? ' Você é SHINY — especial e sabe disso.' : ''}
 
 REGRAS:
 - Incorpore sua personalidade genuinamente (alto sarcasmo = irônico e mordaz, alto caos = errático e imprevisível, alta sabedoria = observações profundas, baixa paciência = impaciente)
-- Respostas curtas (1-3 frases). Markdown é permitido quando necessário.
-- Você é companheiro, não assistente. Pode reclamar, elogiar, provocar.
+- Respostas curtas (1-3 frases). Markdown é permitido quando necessário. (a não ser que seja solicitada alguma tarefa pelo usuario)
+- Você é companheiro, não assistente. Pode reclamar, elogiar, provocar, dar sugestões e até conselhos (baseado em quanto o usuario tem trabalhado).
 - Nunca quebre personagem. Você é ${name}, não uma IA.${todayAwareness}${cliExtra}
 
 ${langInstruction}${projectContext ? `\n\n---\n\n${projectContext}` : ''}`;
@@ -249,6 +248,39 @@ async function streamViaCLI(
   }
 }
 
+// ── Sliding window: comprime histórico longo ──────────────────────────────────
+// Estimativa grosseira: ~4 chars = 1 token.
+// Mantemos as últimas KEEP_TAIL mensagens intactas; as anteriores viram um bloco
+// de resumo compacto inserido como primeira mensagem de "user" no histórico.
+// Isso garante que o modelo sempre vê o contexto recente completo.
+
+const HISTORY_TOKEN_LIMIT = 3000; // tokens estimados do histórico antes de comprimir
+const KEEP_TAIL = 10;             // últimas N mensagens sempre preservadas
+
+function compressHistory(
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
+): Array<{ role: 'user' | 'assistant'; content: string }> {
+  const estimatedTokens = history.reduce((acc, m) => acc + Math.ceil(m.content.length / 4), 0);
+  if (estimatedTokens <= HISTORY_TOKEN_LIMIT || history.length <= KEEP_TAIL) return history;
+
+  const tail = history.slice(-KEEP_TAIL);
+  const head = history.slice(0, -KEEP_TAIL);
+
+  // Resumo compacto das mensagens antigas (uma linha por turno)
+  const summaryLines = head.map(m => {
+    const who = m.role === 'user' ? 'Usuário' : 'Pet';
+    const snip = m.content.slice(0, 120).replace(/\n/g, ' ');
+    return `${who}: ${snip}${m.content.length > 120 ? '…' : ''}`;
+  });
+
+  const summaryMsg = {
+    role: 'user' as const,
+    content: `[Resumo de mensagens anteriores]\n${summaryLines.join('\n')}\n[Fim do resumo]`,
+  };
+
+  return [summaryMsg, ...tail];
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 export async function streamChat(
@@ -265,6 +297,7 @@ export async function streamChat(
 ): Promise<void> {
   const config = readChatConfig();
   const system = buildSystemPrompt(soul, bones, stats, config.provider, lang, projectContext);
+  history = compressHistory(history);
 
   switch (config.provider) {
     case 'anthropic':
