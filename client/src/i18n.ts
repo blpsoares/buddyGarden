@@ -69,7 +69,7 @@ const T = {
     exportCopy: 'copiar',
     exportCopied: 'copiado!',
     exportClose: 'fechar',
-    exportCmd: 'Comando para continuar no Claude:',
+    exportCmd: 'Fork criado! Abra o terminal e execute:',
     // Project picker
     projectPickerTitle: 'Escolher projeto',
     projectPickerUp: 'Pasta acima',
@@ -194,7 +194,7 @@ const T = {
     exportCopy: 'copy',
     exportCopied: 'copied!',
     exportClose: 'close',
-    exportCmd: 'Command to continue in Claude:',
+    exportCmd: 'Fork created! Open terminal and run:',
     // Project picker
     projectPickerTitle: 'Choose project',
     projectPickerUp: 'Parent folder',

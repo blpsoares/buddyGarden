@@ -182,7 +182,7 @@ export function Chat() {
     try {
       const res = await fetch(`/api/conversations/${convId}/export-to-claude`, { method: 'POST' });
       if (!res.ok) return;
-      const data = await res.json() as { path: string; command: string };
+      const data = await res.json() as { path: string; command: string; sessionId: string };
       setExportToast({ convId, path: data.path, cmd: data.command });
       setCopiedToast(false);
     } catch { /* ignore */ }
@@ -290,6 +290,9 @@ export function Chat() {
           <span style={{ flex: 1, wordBreak: 'break-all', fontSize: 12, color: '#aabbff' }}>
             {exportToast.cmd}
           </span>
+          {exportToast.path && (
+            <div style={{ fontSize: 10, color: '#556', marginTop: 3 }}>📁 {exportToast.path}</div>
+          )}
           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
             <button
               style={{ ...iconBtnStyle, fontSize: '11px', color: copiedToast ? '#4caf50' : '#aabbff', border: '1px solid #4a4aaa', padding: '3px 10px' }}

@@ -3,6 +3,19 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 
+const CONFIG_PATH = join(homedir(), '.buddy-garden', 'config.json');
+
+function readProjectDir(): string | null {
+  try {
+    if (existsSync(CONFIG_PATH)) {
+      const cfg = JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>;
+      const dir = cfg['projectDir'] as string | undefined;
+      if (dir && existsSync(dir)) return dir;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 const GARDEN_DIR = join(homedir(), '.buddy-garden');
 const CONV_DIR = join(GARDEN_DIR, 'conversations');
 const INDEX_PATH = join(CONV_DIR, 'index.json');
@@ -91,29 +104,54 @@ export function renameConversation(id: string, title: string) {
   if (meta) { meta.title = title; writeIndex(index); }
 }
 
-export function exportConversationToFile(id: string): { path: string; command: string } | null {
+export function exportConversationToFile(id: string): { path: string; command: string; sessionId: string } | null {
   const messages = getConversation(id);
   if (messages.length === 0) return null;
 
-  const exportsDir = join(GARDEN_DIR, 'exports');
-  if (!existsSync(exportsDir)) mkdirSync(exportsDir, { recursive: true });
+  // Determine target cwd: configured project dir or homedir
+  const cwd = readProjectDir() ?? homedir();
 
-  const lines: string[] = [
-    'System: You are continuing a previous conversation.',
-    '',
-  ];
+  // Claude names project dirs by replacing '/' and '.' with '-'
+  const projectHash = cwd.replace(/[/.]/g, '-');
+  const sessionDir = join(homedir(), '.claude', 'projects', projectHash);
+  if (!existsSync(sessionDir)) mkdirSync(sessionDir, { recursive: true });
+
+  const sessionId = randomUUID();
+  const sessionFile = join(sessionDir, `${sessionId}.jsonl`);
+
+  const lines: string[] = [];
+  let prevUuid: string | null = null;
 
   for (const msg of messages) {
-    const role = msg.role === 'user' ? 'User' : 'Assistant';
-    lines.push(`${role}: ${msg.content}`);
-    lines.push('');
+    const uuid = randomUUID();
+    const timestamp = new Date(msg.ts).toISOString();
+    const base = {
+      parentUuid: prevUuid,
+      isSidechain: false,
+      uuid,
+      timestamp,
+      permissionMode: 'default',
+      userType: 'external',
+      entrypoint: 'sdk-cli',
+      cwd,
+      sessionId,
+      version: '2.1.90',
+    };
+
+    if (msg.role === 'user') {
+      lines.push(JSON.stringify({ ...base, type: 'user', message: { role: 'user', content: msg.content } }));
+    } else {
+      lines.push(JSON.stringify({ ...base, type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: msg.content }] } }));
+    }
+
+    prevUuid = uuid;
   }
 
-  lines.push('User: Continue from where we left off.');
+  writeFileSync(sessionFile, lines.join('\n') + '\n');
 
-  const filePath = join(exportsDir, `${id}.txt`);
-  writeFileSync(filePath, lines.join('\n'));
-
-  const command = `claude --print --model claude-haiku-4-5 < ~/.buddy-garden/exports/${id}.txt`;
-  return { path: filePath, command };
+  return {
+    path: cwd,
+    sessionId,
+    command: `claude --resume ${sessionId}`,
+  };
 }
