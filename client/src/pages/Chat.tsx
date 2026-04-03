@@ -72,6 +72,7 @@ export function Chat() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [frame, setFrame] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Export toast
   const [exportToast, setExportToast] = useState<{ convId: string; path: string; cmd: string } | null>(null);
@@ -231,8 +232,8 @@ export function Chat() {
             {conversations.map(conv => (
               <div
                 key={conv.id}
-                style={convItemStyle(conv.id === conversationId)}
-                onClick={() => { void loadConversation(conv.id); }}
+                style={{ ...convItemStyle(conv.id === conversationId), position: 'relative' }}
+                onClick={() => { setOpenMenuId(null); void loadConversation(conv.id); }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '13px', color: conv.id === conversationId ? '#aabbff' : '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }}>
@@ -242,21 +243,31 @@ export function Chat() {
                     {formatDate(conv.updatedAt)} · {conv.messageCount} msgs
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                {/* Menu ··· */}
+                <div style={{ flexShrink: 0, position: 'relative' }}>
                   <button
-                    style={convActionBtn('#4a8aff')}
-                    onClick={e => { void handleExportToClause(conv.id, e); }}
-                    title={tl('chatExportConv')}
+                    style={menuDotBtn}
+                    title="Opções"
+                    onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === conv.id ? null : conv.id); }}
                   >
-                    ⤴
+                    ···
                   </button>
-                  <button
-                    style={convActionBtn('#ff5555')}
-                    onClick={e => { e.stopPropagation(); void removeConversation(conv.id); }}
-                    title={tl('chatDeleteConv')}
-                  >
-                    🗑
-                  </button>
+                  {openMenuId === conv.id && (
+                    <div style={dropdownStyle} onClick={e => e.stopPropagation()}>
+                      <button
+                        style={dropdownItemStyle}
+                        onClick={e => { setOpenMenuId(null); void handleExportToClause(conv.id, e); }}
+                      >
+                        ↗ Exportar para o Claude
+                      </button>
+                      <button
+                        style={{ ...dropdownItemStyle, color: '#ff6666' }}
+                        onClick={() => { setOpenMenuId(null); void removeConversation(conv.id); }}
+                      >
+                        🗑 Apagar sessão
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -655,18 +666,42 @@ const convItemStyle = (active: boolean): React.CSSProperties => ({
   borderBottom: '1px solid #0f0f1e',
 });
 
-const convActionBtn = (color: string): React.CSSProperties => ({
-  background: `${color}18`,
-  border: `1px solid ${color}44`,
-  color,
+const menuDotBtn: React.CSSProperties = {
+  background: 'transparent',
+  border: 'none',
+  color: '#555',
   cursor: 'pointer',
-  fontSize: '16px',
-  padding: '5px 8px',
-  opacity: 0.85,
-  flexShrink: 0,
+  fontSize: '18px',
+  padding: '4px 8px',
   lineHeight: 1,
+  letterSpacing: '1px',
   borderRadius: 3,
-});
+};
+
+const dropdownStyle: React.CSSProperties = {
+  position: 'absolute',
+  right: 0,
+  top: '100%',
+  zIndex: 100,
+  background: '#0f0f22',
+  border: '1px solid #2a2a44',
+  boxShadow: '0 4px 16px rgba(0,0,0,0.7)',
+  minWidth: 200,
+  display: 'flex',
+  flexDirection: 'column',
+};
+
+const dropdownItemStyle: React.CSSProperties = {
+  background: 'transparent',
+  border: 'none',
+  color: '#ccc',
+  cursor: 'pointer',
+  padding: '10px 14px',
+  textAlign: 'left',
+  fontFamily: 'sans-serif',
+  fontSize: 13,
+  borderBottom: '1px solid #1a1a30',
+};
 
 const containerStyle: React.CSSProperties = {
   flex: 1,

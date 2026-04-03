@@ -312,8 +312,9 @@ export function Garden({ onNavigate }: Props) {
   const [pos, setPos] = useState({ x: 80, y: 580 });
   const [targetPos, setTargetPos] = useState({ x: 80, y: 580 });
   const [happy, setHappy] = useState(false);
-  const [jumping, setJumping] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [specialPlaying, setSpecialPlaying] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [mood, setMood] = useState<Mood>('happy');
   const [devSpeciesIdx, setDevSpeciesIdx] = useState<number | null>(null);
@@ -408,18 +409,18 @@ export function Garden({ onNavigate }: Props) {
   }, [messages, chatOpen]);
 
   const handlePetClick = useCallback(() => {
-    const now = Date.now();
-    if (now - lastClickTime.current < 400) {
-      setHappy(true);
-      setTimeout(() => setHappy(false), 1500);
-    }
-    lastClickTime.current = now;
-    setJumping(true);
-    setTimeout(() => setJumping(false), 600);
+    lastClickTime.current = Date.now();
+    // Dispara animação special; ao terminar, volta ao normal
+    setSpecialPlaying(true);
     setChatOpen(o => {
       if (!o) setTimeout(() => inputRef.current?.focus(), 80);
       return !o;
     });
+  }, []);
+
+  const handleSpecialEnd = useCallback(() => {
+    setSpecialPlaying(false);
+    setHappy(false);
   }, []);
 
   const handleChatSubmit = useCallback((e: React.FormEvent) => {
@@ -578,15 +579,23 @@ export function Garden({ onNavigate }: Props) {
         }}>
           <div
             onClick={handlePetClick}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
             style={{
               cursor: 'pointer',
               transform: happy ? 'scale(1.25) rotate(-6deg)' : 'scale(1)',
               transition: 'transform 0.15s',
-              animation: jumping ? 'petJump 0.6s ease-out' : 'none',
             }}
           >
             {displayBones.species === 'dragon' ? (
-              <DragonBuddy size={200} mood={mood} isMoving={isMoving} moveDir={moveDir} />
+              <DragonBuddy
+                size={200}
+                mood={mood}
+                isMoving={isMoving}
+                moveDir={moveDir}
+                forceAnim={specialPlaying ? 'special' : isHovered ? 'idle' : undefined}
+                onAnimEnd={handleSpecialEnd}
+              />
             ) : (
               <BuddySprite bones={displayBones} frame={frame} size={128} expression={happy ? 'excited' : mood === 'tired' ? 'sleepy' : mood} />
             )}

@@ -17,10 +17,9 @@ interface Props {
   onAnimEnd?: () => void;
 }
 
-function selectAnimation(mood: string, isMoving: boolean, moveDir: number): AnimationType | 'walkl' | 'walkr' {
-  if (mood === 'tired') return 'sleep';
+function selectAnimation(isMoving: boolean, moveDir: number): AnimationType | 'walkl' | 'walkr' {
   if (isMoving) return moveDir >= 0 ? 'walkr' : 'walkl';
-  return 'idle';
+  return 'sleep'; // parado = dormindo; idle só via forceAnim (hover)
 }
 
 function drawAtlasFrame(
@@ -51,7 +50,7 @@ export function DragonBuddy({
   const onAnimEndRef = useRef(onAnimEnd);
   useEffect(() => { onAnimEndRef.current = onAnimEnd; }, [onAnimEnd]);
 
-  const baseAnim = selectAnimation(mood, isMoving, moveDir);
+  const baseAnim = selectAnimation(isMoving, moveDir);
   const animation: DragonAnim = forceAnim ?? baseAnim;
 
   const idle    = useLoadAtlas('/sprites/dragon/idle.json');
