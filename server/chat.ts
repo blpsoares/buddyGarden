@@ -173,6 +173,7 @@ async function streamViaCLI(
   onChunk: (text: string) => void,
   onDone: () => void,
   onError: (err: string) => void,
+  projectDir?: string,
 ): Promise<void> {
   const cleanHistory = history.filter(h => h.content.trim().length > 0);
 
@@ -188,9 +189,10 @@ async function streamViaCLI(
 
     // --output-format stream-json --verbose: emite eventos JSON incrementais
     // com o texto acumulado crescendo a cada token batch gerado pelo modelo.
+    const cwd = (projectDir && existsSync(projectDir)) ? projectDir : tmpDir;
     const proc = Bun.spawn(
       ['claude', '--print', '--output-format', 'stream-json', '--verbose', '--model', model],
-      { stdout: 'pipe', stderr: 'pipe', stdin: 'pipe', cwd: tmpDir },
+      { stdout: 'pipe', stderr: 'pipe', stdin: 'pipe', cwd },
     );
     proc.stdin.write(prompt);
     proc.stdin.end();
@@ -292,6 +294,7 @@ export async function streamChat(
   onError: (err: string) => void,
   lang: 'pt' | 'en' = 'pt',
   projectContext?: string,
+  projectDirs?: string[],
 ): Promise<void> {
   const config = readChatConfig();
   const system = buildSystemPrompt(soul, bones, stats, config.provider, lang, projectContext);
@@ -310,7 +313,11 @@ export async function streamChat(
 
     case 'claude-cli':
     default:
-      await streamViaCLI(message, history, system, config.claudeModel ?? 'claude-haiku-4-5', onChunk, onDone, onError);
+      await streamViaCLI(
+        message, history, system, config.claudeModel ?? 'claude-haiku-4-5',
+        onChunk, onDone, onError,
+        projectDirs?.[0],
+      );
       break;
   }
 }

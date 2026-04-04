@@ -1,9 +1,5 @@
 /**
  * PlayMode — brinque com o seu pet.
- *
- * Interações:
- *   Acariciar  → corações flutuam, pet fica feliz
- *   Buscar!    → osso voa, pet corre atrás, some da tela, volta com discurso engraçado
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -16,34 +12,138 @@ import type { Page } from '../App.tsx';
 
 type PlayState =
   | 'idle'
-  | 'petting'         // acariciando
-  | 'throw_anim'      // osso voando
-  | 'fetching'        // pet sumiu buscando
-  | 'returning';      // pet voltando
+  | 'petting'
+  | 'throw_anim'
+  | 'fetching'
+  | 'returning'
+  | 'trick_prompt'   // mostrando o comando do truque
+  | 'trick_doing'    // executando o truque
+  | 'trick_done';    // comemoração
 
-const FETCH_PHRASES_PT = [
-  'vai lá! 🐾',
-  'cadê que eu vi aqui...',
-  'achei uma minhoca também...',
-  'espera aí...',
-  'quase, quase...',
+// ── Vocabulário expandido ────────────────────────────────────────────────────
+
+const VERBS_FETCH_GO = [
+  'vai lá', 'corre', 'busca', 'arranca', 'voa', 'dispara', 'foge',
+  'sai correndo', 'já tô indo', 'focado', 'mira e corre', 'acelera',
+  'não me para', 'manda ver', 'lança',
 ];
 
-const FETCH_FOUND_PT = [
-  'encontrei! 🦴',
-  'olha o que eu trouxe! 🥳',
-  'foi mal, fui explorar',
-  'achei e já que tava lá dei uma volta',
-  'voltei! 🐾',
+const VERBS_FETCH_SEARCHING = [
+  'procurando...', 'fareijando...', 'farejando o chão...', 'explorando a área...',
+  'achei uma trilha...', 'quase lá...', 'espera...', 'teve uma distração...',
+  'desviei de algo...', 'investigando...', 'cheirando tudo...', 'calculando...',
+  'perdendo tempo aqui...', 'quase!', 'reajustando rota...',
 ];
 
-const PET_PHRASES_PT = [
-  '🥰 *ronrona*',
-  '❤️ mais, mais!',
-  '😊 que bom...',
-  '💕 to gostando',
-  '✨ tô brilhando!',
+const ADJECTIVES_FETCH_FOUND = [
+  'encontrei', 'achei', 'peguei', 'trouxe', 'consegui', 'localizei',
+  'rastreei', 'resgatei', 'capturei', 'recuperei',
 ];
+
+const EXTRAS_FETCH_FOUND = [
+  'e dei uma olhada em tudo', 'e aproveitei pra explorar', 'mas quase me perdi',
+  'tinha muita coisa boa por lá', 'o caminho foi longo mas valeu',
+  'e ainda vi umas coisas legais', 'com uma pequena viagem de volta',
+  'e fiz amizades no caminho', 'foi longe mas tô bem', 'e cheirei umas flores',
+  'descobri um atalho secreto', 'e quase fui pra outro mundo',
+  'me distraí um pouco', 'demorei mais que o planejado',
+];
+
+const REACTIONS_PET = [
+  '*ronrona*', 'mais, mais!', 'que bom...', 'to gostando', 'tô brilhando!',
+  '*suspira feliz*', 'isso aí!', 'não para...', 'tô no paraíso',
+  'você é o melhor', 'tô voando de felicidade', '*ronronaaaaa*',
+  'ohhh sim...', 'assim eu te amo', 'continua!',
+];
+
+const EMOJIS_PET = ['❤️', '💕', '✨', '💖', '🥰', '💗', '🌟', '💫', '🎀', '🩷'];
+
+// ── Truques ──────────────────────────────────────────────────────────────────
+
+interface Trick {
+  command: string;   // o que o usuário "mandou"
+  doing: string;     // o que o pet está fazendo
+  done: string[];    // frases de comemoração
+  emoji: string;
+}
+
+const TRICKS: Trick[] = [
+  {
+    command: 'senta!',
+    doing: 'sentando...',
+    done: ['sentei! 🐾', 'sabe fazer isso com os olhos fechados', 'fácil demais pra mim', 'sentou na vibe'],
+    emoji: '🪑',
+  },
+  {
+    command: 'gira!',
+    doing: 'girando...',
+    done: ['girei! 🌀', 'ficou tonto', 'girou 720°', 'tontura ativada'],
+    emoji: '🌀',
+  },
+  {
+    command: 'pula!',
+    doing: 'pulando...',
+    done: ['pulei! 🦘', 'chegou na lua quase', 'recorde pessoal!', 'superou a gravidade'],
+    emoji: '🦘',
+  },
+  {
+    command: 'deita!',
+    doing: 'deitando...',
+    done: ['deitei... 😴', 'cama modo ativado', 'pronto pra dormir', 'posição de descanso: perfeita'],
+    emoji: '😴',
+  },
+  {
+    command: 'dança!',
+    doing: 'dançando...',
+    done: ['dançou! 💃', 'movimentos impecáveis', 'ritmo no sangue', 'coreografia nova desbloqueada'],
+    emoji: '💃',
+  },
+  {
+    command: 'rugido!',
+    doing: 'rugindo...',
+    done: ['RAAAWR! 🔊', 'vizinhos ligaram', 'decibelzinho alto', 'poder vocal: máximo'],
+    emoji: '🔊',
+  },
+  {
+    command: 'esconde!',
+    doing: 'escondendo...',
+    done: ['😶‍🌫️ sumiu!', 'camuflagem perfeita', 'ninja mode', 'onde fui parar?!'],
+    emoji: '🫥',
+  },
+  {
+    command: 'acena!',
+    doing: 'acenando...',
+    done: ['oi oi! 👋', 'acena pros fãs', 'muito carismático', 'passou na fama'],
+    emoji: '👋',
+  },
+];
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)] as T;
+}
+
+function buildFetchGoPhrase(): string {
+  const verb = pick(VERBS_FETCH_GO);
+  const emojis = ['🐾', '💨', '⚡', '🚀', ''];
+  return `${verb}! ${pick(emojis)}`.trim();
+}
+
+function buildFetchFoundPhrase(petName: string): string {
+  const verb = pick(ADJECTIVES_FETCH_FOUND);
+  const extra = Math.random() > 0.4 ? ` — ${pick(EXTRAS_FETCH_FOUND)}` : '';
+  const emojis = ['🦴', '🥳', '✨', '🎉', '🐾', ''];
+  return `${petName} ${verb}! ${pick(emojis)}${extra}`.trim();
+}
+
+function buildPetPhrase(): string {
+  const reaction = pick(REACTIONS_PET);
+  const emoji = pick(EMOJIS_PET);
+  return `${emoji} ${reaction}`;
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 interface Heart {
   id: number;
@@ -59,15 +159,17 @@ export function PlayMode({ onNavigate }: Props) {
   const { data } = useBuddy();
   const [playState, setPlayState] = useState<PlayState>('idle');
   const [hearts, setHearts] = useState<Heart[]>([]);
-  const [fetchPhrase, setFetchPhrase] = useState('');
   const [speechBubble, setSpeechBubble] = useState('');
-  const [petOffset, setPetOffset] = useState(0); // translateX em px para bounce petting
-  const [petTranslateX, setPetTranslateX] = useState('0%'); // para animação de fetch
+  const [petOffset, setPetOffset] = useState(0);
+  // posição X do pet: null = centro (CSS padrão), 'off-right' = fora pela direita, 'off-left' = fora pela esquerda
+  const [petOffscreen, setPetOffscreen] = useState<'center' | 'off-right' | 'off-left'>('center');
+  const [petTransition, setPetTransition] = useState(true);
   const [boneVisible, setBoneVisible] = useState(false);
   const [boneX, setBoneX] = useState(0);
+  const [currentTrick, setCurrentTrick] = useState<Trick | null>(null);
   const [frame, setFrame] = useState(0);
   const heartIdRef = useRef(0);
-  const pettingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pettingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const phraseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -77,10 +179,9 @@ export function PlayMode({ onNavigate }: Props) {
     return () => clearInterval(t);
   }, []);
 
-  // Limpa timers no unmount
   useEffect(() => {
     return () => {
-      if (pettingTimerRef.current) clearInterval(pettingTimerRef.current);
+      if (pettingTimerRef.current) clearTimeout(pettingTimerRef.current);
       if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current);
       if (phraseTimerRef.current) clearInterval(phraseTimerRef.current);
     };
@@ -89,33 +190,23 @@ export function PlayMode({ onNavigate }: Props) {
   const handlePet = useCallback(() => {
     if (playState !== 'idle' && playState !== 'petting') return;
 
-    // Spawna coração
     setHearts(prev => {
       const newHeart: Heart = {
         id: ++heartIdRef.current,
-        x: 30 + Math.random() * 40, // %
-        emoji: ['❤️', '💕', '✨', '💖', '🥰'][Math.floor(Math.random() * 5)] ?? '❤️',
+        x: 30 + Math.random() * 40,
+        emoji: pick(EMOJIS_PET),
       };
-      return [...prev.slice(-6), newHeart]; // max 7 corações
+      return [...prev.slice(-6), newHeart];
     });
 
-    // Remove coração após animação
     const id = heartIdRef.current;
-    setTimeout(() => {
-      setHearts(prev => prev.filter(h => h.id !== id));
-    }, 1800);
+    setTimeout(() => setHearts(prev => prev.filter(h => h.id !== id)), 1800);
 
-    // Alterna speech bubble
-    const phrase = PET_PHRASES_PT[Math.floor(Math.random() * PET_PHRASES_PT.length)] ?? '🥰';
-    setSpeechBubble(phrase);
-
-    // Pequeno bounce
+    setSpeechBubble(buildPetPhrase());
     setPetOffset(-8);
     setTimeout(() => setPetOffset(0), 150);
-
     setPlayState('petting');
 
-    // Volta ao idle após 2s sem clicar
     if (pettingTimerRef.current) clearTimeout(pettingTimerRef.current);
     pettingTimerRef.current = setTimeout(() => {
       setPlayState('idle');
@@ -126,7 +217,6 @@ export function PlayMode({ onNavigate }: Props) {
   const handleFetch = useCallback(() => {
     if (playState !== 'idle' && playState !== 'petting') return;
 
-    // Para petting se estava
     if (pettingTimerRef.current) clearTimeout(pettingTimerRef.current);
     setSpeechBubble('');
     setHearts([]);
@@ -136,53 +226,98 @@ export function PlayMode({ onNavigate }: Props) {
     setBoneVisible(true);
     setBoneX(20);
 
-    // Anima o osso voando
     let bonePos = 20;
     const boneAnim = setInterval(() => {
       bonePos += 8;
       setBoneX(bonePos);
-      if (bonePos > 110) {
+      if (bonePos > 115) {
         clearInterval(boneAnim);
         setBoneVisible(false);
       }
     }, 30);
 
-    // 2. Após 400ms pet corre atrás (sai completamente da tela)
+    // 2. Após 400ms o pet corre e SAI DA TELA pela direita
     fetchTimerRef.current = setTimeout(() => {
       setPlayState('fetching');
-      setSpeechBubble(FETCH_PHRASES_PT[0] ?? 'vai lá!');
-      setPetTranslateX('200%');
+      setSpeechBubble(buildFetchGoPhrase());
+      // Animação de saída: desliza para fora pela direita
+      setPetTransition(true);
+      setPetOffscreen('off-right');
 
-      // Frases rotativas enquanto vai buscar
+      // Frases rotativas enquanto busca
       let phraseIdx = 0;
       if (phraseTimerRef.current) clearInterval(phraseTimerRef.current);
       phraseTimerRef.current = setInterval(() => {
-        phraseIdx = (phraseIdx + 1) % FETCH_PHRASES_PT.length;
-        setSpeechBubble(FETCH_PHRASES_PT[phraseIdx] ?? '...');
+        phraseIdx = (phraseIdx + 1) % VERBS_FETCH_SEARCHING.length;
+        setSpeechBubble(VERBS_FETCH_SEARCHING[phraseIdx] ?? '...');
       }, 900);
 
-      // 3. Após 3.5s pet volta do lado esquerdo (totalmente fora da tela)
+      // 3. Após 3s, teleporta para fora pela esquerda SEM transição
       fetchTimerRef.current = setTimeout(() => {
         if (phraseTimerRef.current) clearInterval(phraseTimerRef.current);
-        const found = FETCH_FOUND_PT[Math.floor(Math.random() * FETCH_FOUND_PT.length)] ?? 'voltei!';
-        setSpeechBubble(found);
-        setPlayState('returning');
-        setPetTranslateX('-200%');
 
-        // Sem animação: posição pula para esquerda (fora da tela), depois desliza ao centro
+        // Desabilita transição → pula para fora pela esquerda instantaneamente
+        setPetTransition(false);
+        setPetOffscreen('off-left');
+
+        // Re-habilita transição no próximo frame → desliza para o centro
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            setPetTranslateX('0%');
+            setPetTransition(true);
+            setPetOffscreen('center');
+            setPlayState('returning');
           });
         });
 
-        // 4. Volta ao idle após retornar
-        fetchTimerRef.current = setTimeout(() => {
+      }, 3000);
+    }, 400);
+  }, [playState]);
+
+  // Volta ao idle após pet retornar ao centro
+  useEffect(() => {
+    if (playState !== 'returning') return;
+    const petName = data.soul?.name ?? data.bones?.species ?? 'Buddy';
+    const phrase = buildFetchFoundPhrase(petName);
+    setSpeechBubble(phrase);
+
+    const t = setTimeout(() => {
+      setPlayState('idle');
+      setSpeechBubble('');
+    }, 3500);
+    return () => clearTimeout(t);
+  }, [playState, data.soul?.name, data.bones?.species]);
+
+  const handleTrick = useCallback(() => {
+    if (playState !== 'idle' && playState !== 'petting') return;
+    if (pettingTimerRef.current) clearTimeout(pettingTimerRef.current);
+    setHearts([]);
+
+    const trick = pick(TRICKS);
+    setCurrentTrick(trick);
+    setSpeechBubble(`${trick.command} ${trick.emoji}`);
+    setPlayState('trick_prompt');
+
+    // Pet "executa" o truque após 800ms
+    const t1 = setTimeout(() => {
+      setPlayState('trick_doing');
+      setSpeechBubble(trick.doing);
+
+      // Finaliza com comemoração
+      const t2 = setTimeout(() => {
+        setPlayState('trick_done');
+        setSpeechBubble(pick(trick.done));
+
+        // Volta ao idle
+        const t3 = setTimeout(() => {
           setPlayState('idle');
           setSpeechBubble('');
-        }, 3000);
-      }, 3500);
-    }, 400);
+          setCurrentTrick(null);
+        }, 2500);
+        fetchTimerRef.current = t3;
+      }, 1500);
+      fetchTimerRef.current = t2;
+    }, 800);
+    fetchTimerRef.current = t1;
   }, [playState]);
 
   if (!data.bones && !data.soul) {
@@ -205,9 +340,19 @@ export function PlayMode({ onNavigate }: Props) {
       ? 'walkr'
       : playState === 'returning'
         ? 'walkl'
-        : 'idle';
+        : playState === 'trick_doing'
+          ? 'special'
+          : 'idle';
 
-  const isMoving = playState === 'fetching' || playState === 'returning';
+  // Pet só "anda" quando está realmente se movendo (saindo/voltando da tela)
+  const isActuallyMoving = playState === 'fetching' || playState === 'returning';
+
+  const petTranslateX =
+    petOffscreen === 'off-right' ? '200vw'
+    : petOffscreen === 'off-left' ? '-200vw'
+    : '0px';
+
+  const trickScale = playState === 'trick_doing' ? 1.12 : playState === 'trick_done' ? 1.05 : 1;
 
   return (
     <div style={containerStyle}>
@@ -225,7 +370,7 @@ export function PlayMode({ onNavigate }: Props) {
         <div style={{ width: 40 }} />
       </div>
 
-      {/* Arena de brincadeiras */}
+      {/* Arena */}
       <div style={arenaStyle}>
 
         {/* Osso voador */}
@@ -241,6 +386,21 @@ export function PlayMode({ onNavigate }: Props) {
             filter: 'drop-shadow(0 3px 8px rgba(0,0,0,0.7))',
           }}>
             🦴
+          </div>
+        )}
+
+        {/* Truque — exibe o comando visualmente */}
+        {(playState === 'trick_prompt' || playState === 'trick_doing') && currentTrick && (
+          <div style={{
+            position: 'absolute',
+            top: '14%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontSize: 44,
+            zIndex: 25,
+            animation: 'trickPop 0.3s ease-out',
+          }}>
+            {currentTrick.emoji}
           </div>
         )}
 
@@ -276,20 +436,18 @@ export function PlayMode({ onNavigate }: Props) {
         <div
           style={{
             ...petWrapStyle,
-            transform: `translateX(${petTranslateX}) translateY(${petOffset}px)`,
-            transition: playState === 'fetching'
-              ? 'transform 0.6s ease-in'
-              : playState === 'returning'
-                ? 'transform 0.7s ease-out'
-                : `transform 0.15s ease-out`,
+            transform: `translateX(${petTranslateX}) translateY(${petOffset}px) scale(${trickScale})`,
+            transition: petTransition
+              ? `transform ${isActuallyMoving ? (playState === 'fetching' ? '0.55s ease-in' : '0.65s ease-out') : '0.18s ease-out'}`
+              : 'none',
           }}
           onClick={handlePet}
         >
           {isDragon && bones ? (
             <DragonBuddy
               size={300}
-              mood={playState === 'petting' ? 'excited' : 'happy'}
-              isMoving={isMoving}
+              mood={playState === 'petting' || playState === 'trick_done' ? 'excited' : 'happy'}
+              isMoving={isActuallyMoving}
               forceAnim={forceAnim}
             />
           ) : bones ? (
@@ -297,7 +455,7 @@ export function PlayMode({ onNavigate }: Props) {
               bones={bones}
               frame={frame}
               size={240}
-              expression={playState === 'petting' ? 'excited' : 'happy'}
+              expression={playState === 'petting' || playState === 'trick_done' ? 'excited' : 'happy'}
             />
           ) : null}
         </div>
@@ -313,14 +471,18 @@ export function PlayMode({ onNavigate }: Props) {
               <span style={{ fontSize: 20 }}>🦴</span>
               <span style={pixelText(7)}>buscar!</span>
             </button>
+            <button onClick={handleTrick} style={actionBtn('#4a2a6e', '#8a5aaa')}>
+              <span style={{ fontSize: 20 }}>🎪</span>
+              <span style={pixelText(7)}>truque!</span>
+            </button>
           </div>
         )}
 
         {/* Status durante fetch */}
         {playState === 'fetching' && (
           <div style={{ textAlign: 'center', marginTop: 20 }}>
-            <span style={{ fontFamily: 'sans-serif', fontSize: 13, color: '#666' }}>
-              {petName} está procurando...
+            <span style={{ fontFamily: 'sans-serif', fontSize: 13, color: '#555' }}>
+              {petName} está por aí...
             </span>
           </div>
         )}
@@ -336,20 +498,22 @@ export function PlayMode({ onNavigate }: Props) {
           from { transform: rotate(0deg); }
           to   { transform: rotate(360deg); }
         }
+        @keyframes trickPop {
+          0%   { opacity: 0; transform: translateX(-50%) scale(0.5); }
+          60%  { transform: translateX(-50%) scale(1.2); }
+          100% { opacity: 1; transform: translateX(-50%) scale(1); }
+        }
       `}</style>
     </div>
   );
 }
 
-// ── Styles ──────────────────────────────────────────────────────────────────────
+// ── Styles ────────────────────────────────────────────────────────────────────
 
 const containerStyle: React.CSSProperties = {
-  width: '100%',
-  height: '100%',
-  position: 'relative',
-  overflow: 'hidden',
-  display: 'flex',
-  flexDirection: 'column',
+  width: '100%', height: '100%',
+  position: 'relative', overflow: 'hidden',
+  display: 'flex', flexDirection: 'column',
 };
 
 const centerStyle: React.CSSProperties = {
@@ -359,11 +523,8 @@ const centerStyle: React.CSSProperties = {
 };
 
 const hudStyle: React.CSSProperties = {
-  position: 'relative',
-  zIndex: 10,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
+  position: 'relative', zIndex: 10,
+  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   padding: '10px 16px',
   background: 'rgba(0,0,0,0.55)',
   backdropFilter: 'blur(4px)',
@@ -374,77 +535,59 @@ const hudStyle: React.CSSProperties = {
 const backBtn: React.CSSProperties = {
   background: 'rgba(20,20,50,0.8)',
   border: '2px solid rgba(80,80,180,0.4)',
-  color: '#aaa',
-  cursor: 'pointer',
-  padding: '6px 10px',
-  fontSize: 16,
+  color: '#aaa', cursor: 'pointer',
+  padding: '6px 10px', fontSize: 16,
   boxShadow: '2px 2px 0 rgba(0,0,0,0.5)',
 };
 
 const arenaStyle: React.CSSProperties = {
-  flex: 1,
-  position: 'relative',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
+  flex: 1, position: 'relative',
+  display: 'flex', flexDirection: 'column',
+  alignItems: 'center', justifyContent: 'flex-end',
   paddingBottom: '80px',
   overflow: 'hidden',
 };
 
 const petWrapStyle: React.CSSProperties = {
-  position: 'relative',
-  zIndex: 15,
+  position: 'relative', zIndex: 15,
   cursor: 'pointer',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
+  display: 'flex', flexDirection: 'column', alignItems: 'center',
+  transformOrigin: 'bottom center',
 };
 
 const speechBubbleStyle: React.CSSProperties = {
   position: 'absolute',
-  top: '20%',
-  left: '50%',
+  top: '20%', left: '50%',
   transform: 'translateX(-50%)',
   background: 'rgba(14,14,40,0.95)',
   border: '1px solid rgba(80,80,200,0.5)',
   padding: '10px 16px',
-  maxWidth: 220,
-  textAlign: 'center',
+  maxWidth: 260, textAlign: 'center',
   boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
   zIndex: 20,
   animation: 'fadeIn 0.2s ease',
 };
 
 const bubbleTailStyle: React.CSSProperties = {
-  position: 'absolute',
-  bottom: -8,
-  left: '50%',
+  position: 'absolute', bottom: -8, left: '50%',
   transform: 'translateX(-50%)',
-  width: 0,
-  height: 0,
+  width: 0, height: 0,
   borderLeft: '8px solid transparent',
   borderRight: '8px solid transparent',
   borderTop: '8px solid rgba(14,14,40,0.95)',
 };
 
 const actionsStyle: React.CSSProperties = {
-  position: 'absolute',
-  bottom: 16,
-  left: '50%',
+  position: 'absolute', bottom: 16, left: '50%',
   transform: 'translateX(-50%)',
-  display: 'flex',
-  gap: 16,
-  zIndex: 20,
+  display: 'flex', gap: 12, zIndex: 20,
 };
 
 function actionBtn(bg: string, border: string): React.CSSProperties {
   return {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 6,
-    padding: '12px 20px',
+    display: 'flex', flexDirection: 'column',
+    alignItems: 'center', gap: 6,
+    padding: '12px 18px',
     background: `${bg}cc`,
     border: `2px solid ${border}`,
     cursor: 'pointer',
@@ -457,8 +600,6 @@ function actionBtn(bg: string, border: string): React.CSSProperties {
 function pixelText(size: number): React.CSSProperties {
   return {
     fontFamily: '"Press Start 2P", monospace',
-    fontSize: size,
-    color: '#eee',
-    display: 'block',
+    fontSize: size, color: '#eee', display: 'block',
   };
 }

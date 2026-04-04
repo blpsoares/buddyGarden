@@ -252,12 +252,13 @@ Bun.serve({
 
       // Project context — usa projectDirs da conversa (múltiplas pastas)
       let projectContextStr: string | undefined;
+      let validProjectDirs: string[] = [];
       try {
         const convMeta = conversationId ? getConversationMeta(conversationId) : null;
         const projectDirs = getConversationProjectDirs(convMeta);
-        const validDirs = projectDirs.filter(d => existsSync(d));
-        if (validDirs.length > 0) {
-          const contexts = await Promise.all(validDirs.map(d => buildProjectContext(d)));
+        validProjectDirs = projectDirs.filter(d => existsSync(d));
+        if (validProjectDirs.length > 0) {
+          const contexts = await Promise.all(validProjectDirs.map(d => buildProjectContext(d)));
           projectContextStr = contexts.map(c => c.summary).join('\n\n---\n\n');
         }
       } catch { /* projeto opcional, nunca bloqueia o chat */ }
@@ -312,6 +313,7 @@ Bun.serve({
             },
             chatLang,
             projectContextStr,
+            validProjectDirs.length > 0 ? validProjectDirs : undefined,
           ).catch((e: unknown) => {
             console.error('Chat error:', e);
             safeClose();

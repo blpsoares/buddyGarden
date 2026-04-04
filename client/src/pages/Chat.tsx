@@ -248,8 +248,18 @@ export function Chat() {
                 onClick={() => { setOpenMenuId(null); void loadConversation(conv.id); }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', color: conv.id === conversationId ? '#aabbff' : '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }}>
-                    {conv.title}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+                    <img
+                      src={conv.forkedSessionId ? claudeChatIcon : gardenChatIcon}
+                      alt={conv.forkedSessionId ? 'Claude' : 'Buddy'}
+                      title={conv.forkedSessionId
+                        ? `Forked para Claude · ${conv.forkedProjectDir ?? ''}`
+                        : (conv.projectDirs?.length ? `Buddy Garden · ${conv.projectDirs.join(', ')}` : 'Buddy Garden')}
+                      style={{ width: 18, height: 18, imageRendering: 'pixelated', opacity: 0.7, flexShrink: 0 }}
+                    />
+                    <div style={{ fontSize: '13px', color: conv.id === conversationId ? '#aabbff' : '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {conv.title}
+                    </div>
                   </div>
                   <div style={{ fontSize: '11px', color: '#555' }}>
                     {formatDate(conv.updatedAt)} · {conv.messageCount} msgs
@@ -320,7 +330,7 @@ export function Chat() {
         {/* Header */}
         <div style={headerStyle}>
           <button onClick={() => setSidebarOpen(s => !s)} style={iconBtnStyle} title="histórico">
-            ☰
+            <SidebarToggleIcon open={sidebarOpen} />
           </button>
           <div style={{ marginLeft: '8px', flexShrink: 0 }}>
             {isDragon
@@ -339,15 +349,17 @@ export function Chat() {
             )}
           </div>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Ícone read-only: mostra onde o contexto está salvo (Buddy Garden ou Claude Code) */}
-            <img
-              src={activeConvMeta?.forkedSessionId ? claudeChatIcon : gardenChatIcon}
-              alt={activeConvMeta?.forkedSessionId ? 'Claude Code' : 'Buddy Garden'}
-              title={activeConvMeta?.forkedSessionId
-                ? `Forked para Claude · ${activeConvMeta.forkedProjectDir ?? ''}`
-                : activeConvProjectDirs.length ? `Buddy Garden · ${activeConvProjectDirs.join(', ')}` : 'Buddy Garden'}
-              style={{ width: 20, height: 20, imageRendering: 'pixelated', opacity: 0.75, flexShrink: 0 }}
-            />
+            {/* Ícone de contexto — só no header quando sidebar fechado */}
+            {!sidebarOpen && (
+              <img
+                src={activeConvMeta?.forkedSessionId ? claudeChatIcon : gardenChatIcon}
+                alt={activeConvMeta?.forkedSessionId ? 'Claude Code' : 'Buddy Garden'}
+                title={activeConvMeta?.forkedSessionId
+                  ? `Forked para Claude · ${activeConvMeta.forkedProjectDir ?? ''}`
+                  : activeConvProjectDirs.length ? `Buddy Garden · ${activeConvProjectDirs.join(', ')}` : 'Buddy Garden'}
+                style={{ width: 28, height: 28, imageRendering: 'pixelated', opacity: 0.85, flexShrink: 0 }}
+              />
+            )}
             {/* Chips de pastas de contexto */}
             {activeConvProjectDirs.map(dir => (
               <div
@@ -895,4 +907,20 @@ const exportToastStyle: React.CSSProperties = {
 
 function pixelText(size: number): React.CSSProperties {
   return { fontFamily: '"Press Start 2P", monospace', fontSize: `${size}px`, color: '#eee' };
+}
+
+/** Ícone de toggle do aside — estilo ChatGPT/Claude */
+function SidebarToggleIcon(_: { open: boolean }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
+      {/* Borda do painel */}
+      <rect x="1.5" y="1.5" width="17" height="17" rx="3.5" stroke="currentColor" strokeWidth="1.5" />
+      {/* Separador vertical do aside */}
+      <line x1="7" y1="1.5" x2="7" y2="18.5" stroke="currentColor" strokeWidth="1.5" />
+      {/* Linhas de conteúdo no painel principal */}
+      <line x1="10" y1="7"  x2="15" y2="7"  stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="10" y1="10" x2="16" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="10" y1="13" x2="14" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
 }

@@ -313,10 +313,11 @@ export function Garden({ onNavigate }: Props) {
   const [targetPos, setTargetPos] = useState({ x: 80, y: 580 });
   const [happy, setHappy] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [clickMenu, setClickMenu] = useState(false); // menu de ações ao clicar no pet
   const [isHovered, setIsHovered] = useState(false);
   const [specialPlaying, setSpecialPlaying] = useState(false);
   const [isSleeping, setIsSleeping] = useState(false);       // inatividade (20s)
-  const [isNaturallyResting, setIsNaturallyResting] = useState(false); // descanso natural entre caminhadas
+  const [isNaturallyResting, setIsNaturallyResting] = useState(false); // descanso natural entre caminhadas (pausa o movimento)
 
   // Timers — todos via ref para evitar closures stale
   const sleepTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -469,11 +470,9 @@ export function Garden({ onNavigate }: Props) {
   const handlePetClick = useCallback(() => {
     lastClickTime.current = Date.now();
     markInteraction();
-    setSpecialPlaying(true);
-    setChatOpen(o => {
-      if (!o) setTimeout(() => inputRef.current?.focus(), 80);
-      return !o;
-    });
+    // fecha qualquer chat aberto e abre o menu radial
+    setChatOpen(false);
+    setClickMenu(m => !m);
   }, [markInteraction]);
 
   const handleSpecialEnd = useCallback(() => {
@@ -507,7 +506,7 @@ export function Garden({ onNavigate }: Props) {
   }, [messages, conversationId, onNavigate]);
 
   // Precisa ficar antes dos early returns para não violar Rules of Hooks
-  const isMoving = Math.hypot(targetPos.x - pos.x, targetPos.y - pos.y) > 5;
+  const isMoving = !isSleeping && !isHovered && !isNaturallyResting && Math.hypot(targetPos.x - pos.x, targetPos.y - pos.y) > 5;
   const moveDir = targetPos.x - pos.x; // positivo = direita, negativo = esquerda
   const visibleMessages = messages.filter(m => !m.hidden);
 
@@ -532,6 +531,11 @@ export function Garden({ onNavigate }: Props) {
           90%  { transform: translateY(-12px) scale(1.01); }
           100% { transform: translateY(0) scale(1); }
         }
+        @keyframes menuPop {
+          0%   { opacity: 0; transform: scale(0.85) translateY(6px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
       `}</style>
 
       {/* ── Fundo (sky) ── */}
@@ -638,7 +642,7 @@ export function Garden({ onNavigate }: Props) {
           <div
             onClick={handlePetClick}
             onMouseEnter={() => { markInteraction(); setIsHovered(true); }}
-            onMouseLeave={() => { lastInteractionRef.current = Date.now(); setIsHovered(false); }}
+            onMouseLeave={() => { lastClickTime.current = Date.now(); setIsHovered(false); }}
             style={{
               cursor: 'pointer',
               transform: happy ? 'scale(1.25) rotate(-6deg)' : 'scale(1)',
@@ -658,6 +662,53 @@ export function Garden({ onNavigate }: Props) {
               <BuddySprite bones={displayBones} frame={frame} size={128} expression={happy ? 'excited' : mood === 'tired' ? 'sleepy' : mood} />
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── Click menu ── */}
+      {clickMenu && (
+        <div
+          style={{
+            position: 'absolute',
+            left: pos.x - 20,
+            top: Math.max(8, pos.y - 140),
+            zIndex: 35,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            animation: 'menuPop 0.15s ease-out',
+          }}
+        >
+          <button
+            style={clickMenuBtn('#1a2a4a', '#4a6aaa')}
+            onClick={() => {
+              setClickMenu(false);
+              setChatOpen(true);
+              setTimeout(() => inputRef.current?.focus(), 80);
+            }}
+          >
+            <span style={{ fontSize: 14 }}>💬</span>
+            <span style={clickMenuLabel}>conversa rápida</span>
+          </button>
+          <button
+            style={clickMenuBtn('#1a1a3a', '#6a4aaa')}
+            onClick={() => { setClickMenu(false); void handleFullscreen(); }}
+          >
+            <span style={{ fontSize: 14 }}>⛶</span>
+            <span style={clickMenuLabel}>chat completo</span>
+          </button>
+          <button
+            style={clickMenuBtn('#2a1a1a', '#aa4a4a')}
+            onClick={() => { setClickMenu(false); onNavigate('play'); }}
+          >
+            <span style={{ fontSize: 14 }}>🎮</span>
+            <span style={clickMenuLabel}>play!</span>
+          </button>
+          {/* overlay para fechar clicando fora */}
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: -1 }}
+            onClick={() => setClickMenu(false)}
+          />
         </div>
       )}
 
@@ -883,9 +934,6 @@ export function Garden({ onNavigate }: Props) {
               </button>
             </form>
           </div>
-          <style>{`
-            @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
-          `}</style>
         </div>
       )}
     </div>
@@ -948,6 +996,29 @@ const iconBtn: React.CSSProperties = {
   background: 'transparent', border: 'none',
   cursor: 'pointer', fontSize: '14px',
   padding: '0 3px', lineHeight: 1, color: '#aaa',
+};
+
+function clickMenuBtn(bg: string, border: string): React.CSSProperties {
+  return {
+    display: 'flex', alignItems: 'center', gap: 8,
+    padding: '8px 14px',
+    background: `${bg}ee`,
+    border: `2px solid ${border}`,
+    cursor: 'pointer',
+    color: '#eee',
+    boxShadow: '2px 2px 0 rgba(0,0,0,0.6)',
+    backdropFilter: 'blur(6px)',
+    whiteSpace: 'nowrap',
+    width: '100%',
+    textAlign: 'left',
+  };
+}
+
+const clickMenuLabel: React.CSSProperties = {
+  fontFamily: '"Press Start 2P", monospace',
+  fontSize: 7,
+  color: '#ddd',
+  letterSpacing: '0.05em',
 };
 
 // Modal
