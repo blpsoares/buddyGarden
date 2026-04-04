@@ -1,0 +1,4 @@
+#!/bin/sh
+# Roda unit tests antes de cada commit (apenas *.test.ts, não *.spec.ts)
+echo "🧪 Rodando testes unitários..."
+bun test tests/*.test.ts --timeout 30000

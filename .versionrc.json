@@ -1,0 +1,17 @@
+{
+  "types": [
+    { "type": "feat",     "section": "✨ Novas features" },
+    { "type": "fix",      "section": "🐛 Correções" },
+    { "type": "perf",     "section": "⚡ Performance" },
+    { "type": "refactor", "section": "♻️ Refatorações" },
+    { "type": "test",     "section": "🧪 Testes" },
+    { "type": "docs",     "section": "📝 Documentação" },
+    { "type": "chore",    "section": "🔧 Chores", "hidden": true },
+    { "type": "style",    "section": "💄 Estilo", "hidden": true },
+    { "type": "ci",       "section": "👷 CI", "hidden": true }
+  ],
+  "commitUrlFormat": "https://github.com/blpsoares/buddyGarden/commit/{{hash}}",
+  "compareUrlFormat": "https://github.com/blpsoares/buddyGarden/compare/{{previousTag}}...{{currentTag}}",
+  "issueUrlFormat": "https://github.com/blpsoares/buddyGarden/issues/{{id}}",
+  "releaseCommitMessageFormat": "chore(release): v{{currentTag}}"
+}

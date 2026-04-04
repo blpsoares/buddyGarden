@@ -1,0 +1,12 @@
+#!/bin/sh
+# Roda type-check + unit tests + build antes de push
+echo "🔍 Verificando tipos TypeScript..."
+bunx tsc --noEmit
+
+echo "🧪 Rodando testes unitários..."
+bun test tests/*.test.ts --timeout 30000
+
+echo "🏗️  Verificando build..."
+bun run build
+
+echo "✅ Tudo certo! Push autorizado."
