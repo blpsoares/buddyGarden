@@ -566,7 +566,7 @@ export function Garden({ onNavigate }: Props) {
 
       {/* ── Label do cenário ── */}
       <div style={{ position: 'absolute', top: 6, right: 8, zIndex: 5 }}>
-        <span style={{ fontFamily: 'sans-serif', fontSize: '10px', color: 'rgba(255,255,255,0.45)' }}>
+        <span style={{ fontFamily: 'inherit', fontSize: '10px', color: 'rgba(255,255,255,0.45)' }}>
           {scene.label}
         </span>
       </div>
@@ -747,7 +747,7 @@ export function Garden({ onNavigate }: Props) {
                     background: isUser ? 'rgba(55,55,140,0.88)' : 'rgba(10,10,30,0.88)',
                     border: `2px solid ${isUser ? 'rgba(100,100,220,0.6)' : 'rgba(80,80,180,0.45)'}`,
                     color: '#eee',
-                    fontFamily: 'sans-serif',
+                    fontFamily: 'inherit',
                     fontSize: '11px',
                     lineHeight: 1.45,
                     wordBreak: 'break-word',
@@ -819,7 +819,7 @@ export function Garden({ onNavigate }: Props) {
                     {soul?.name ?? bones.species}
                   </span>
                   {isStreaming && (
-                    <span style={{ display: 'block', fontFamily: 'sans-serif', fontSize: '10px', color: '#4caf50', marginTop: 2 }}>
+                    <span style={{ display: 'block', fontFamily: 'inherit', fontSize: '10px', color: '#4caf50', marginTop: 2 }}>
                       {tl('gardenChatTyping')}
                     </span>
                   )}
@@ -854,7 +854,7 @@ export function Garden({ onNavigate }: Props) {
 
             {/* Badge: conversa já salva */}
             {conversationId && (
-              <div style={{ padding: '4px 12px', background: 'rgba(10,30,10,0.95)', borderBottom: '1px solid rgba(40,120,40,0.3)', fontFamily: 'sans-serif', fontSize: '11px', color: '#4caf50' }}>
+              <div style={{ padding: '4px 12px', background: 'rgba(10,30,10,0.95)', borderBottom: '1px solid rgba(40,120,40,0.3)', fontFamily: 'inherit', fontSize: '11px', color: '#4caf50' }}>
                 {tl('gardenChatSaved')}
               </div>
             )}
@@ -893,7 +893,7 @@ export function Garden({ onNavigate }: Props) {
                       : 'rgba(18,18,45,0.92)',
                     border: `1px solid ${msg.role === 'user' ? 'rgba(100,100,220,0.5)' : 'rgba(60,60,100,0.4)'}`,
                     color: '#eee',
-                    fontFamily: 'sans-serif',
+                    fontFamily: 'inherit',
                     fontSize: '13px',
                     lineHeight: 1.55,
                     whiteSpace: 'pre-wrap',
@@ -951,7 +951,7 @@ export function Garden({ onNavigate }: Props) {
           }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>💾</div>
             <p style={{ ...pixelFont, fontSize: '8px', marginBottom: 8 }}>salvar conversa?</p>
-            <p style={{ fontFamily: 'sans-serif', fontSize: 12, color: '#666', marginBottom: 20, lineHeight: 1.5 }}>
+            <p style={{ fontFamily: 'inherit', fontSize: 12, color: '#666', marginBottom: 20, lineHeight: 1.5 }}>
               Deseja salvar esta conversa no histórico permanentemente?
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
@@ -967,7 +967,7 @@ export function Garden({ onNavigate }: Props) {
                   setChatOpen(false);
                 }}
                 style={{
-                  fontFamily: 'sans-serif', fontSize: 13,
+                  fontFamily: 'inherit', fontSize: 13,
                   background: savingQuickChat ? '#1a1a4a' : '#2a2a7a',
                   border: '1px solid #4a4aaa', color: '#aabbff',
                   cursor: savingQuickChat ? 'wait' : 'pointer',
@@ -984,7 +984,7 @@ export function Garden({ onNavigate }: Props) {
                   setChatOpen(false);
                 }}
                 style={{
-                  fontFamily: 'sans-serif', fontSize: 13,
+                  fontFamily: 'inherit', fontSize: 13,
                   background: 'transparent', border: '1px solid #333',
                   color: '#666', cursor: 'pointer', padding: '8px 18px',
                 }}
@@ -1123,7 +1123,7 @@ const modalInput: React.CSSProperties = {
   flex: 1, padding: '8px 12px',
   background: 'rgba(14,14,36,0.95)',
   border: '1px solid rgba(80,80,180,0.45)',
-  color: '#eee', fontFamily: 'sans-serif', fontSize: '14px',
+  color: '#eee', fontFamily: 'inherit', fontSize: '14px',
   outline: 'none',
 };
 

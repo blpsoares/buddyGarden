@@ -67,7 +67,7 @@ export function Chat() {
     conversationId, isAnonymous, conversations,
     loadConversation, newConversation, removeConversation, setIsAnonymous,
     addConvProjectDir, removeConvProjectDir, activeConvMeta, activeConvProjectDirs,
-    lang, setLang, chatFont, setChatFont,
+    lang, chatFont,
   } = useChat();
   const tl = useT();
   const { data } = useBuddy();
@@ -76,8 +76,6 @@ export function Chat() {
   const [frame, setFrame] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [fontPickerOpen, setFontPickerOpen] = useState(false);
-
   // Fecha dropdown ao clicar fora
   useEffect(() => {
     if (!openMenuId) return;
@@ -344,7 +342,7 @@ export function Chat() {
           <div style={{ marginLeft: '10px', flex: 1 }}>
             <span style={pixelText(11)}>{petName}</span>
             {isStreaming && (
-              <span style={{ fontFamily: 'sans-serif', fontSize: 12, color: '#4caf50', display: 'block', marginTop: 2 }}>
+              <span style={{ fontFamily: 'inherit', fontSize: 12, color: '#4caf50', display: 'block', marginTop: 2 }}>
                 {tl('chatTyping')}
               </span>
             )}
@@ -398,50 +396,6 @@ export function Chat() {
               📁 <span style={{ fontSize: 11 }}>+</span>
             </button>
             <button
-              onClick={() => setLang(lang === 'pt' ? 'en' : 'pt')}
-              style={{ ...iconBtnStyle, fontSize: 16 }}
-              title={tl('chatLangToggle')}
-            >
-              {lang === 'pt' ? '🇧🇷' : '🇺🇸'}
-            </button>
-            {/* Font picker */}
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={() => setFontPickerOpen(o => !o)}
-                style={{ ...iconBtnStyle, fontSize: 13, color: fontPickerOpen ? '#aabbff' : '#888', padding: '5px 8px' }}
-                title="Trocar fonte"
-              >
-                Aa
-              </button>
-              {fontPickerOpen && (
-                <>
-                  <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setFontPickerOpen(false)} />
-                  <div style={fontDropdownStyle}>
-                    {CHAT_FONTS.map(f => (
-                      <button
-                        key={f.value}
-                        onClick={() => { setChatFont(f.value); setFontPickerOpen(false); }}
-                        style={{
-                          display: 'block', width: '100%', textAlign: 'left',
-                          padding: '8px 14px',
-                          background: chatFont === f.value ? 'rgba(80,80,200,0.2)' : 'transparent',
-                          border: 'none',
-                          borderLeft: chatFont === f.value ? '2px solid #6a6aee' : '2px solid transparent',
-                          color: chatFont === f.value ? '#aabbff' : '#ccc',
-                          cursor: 'pointer',
-                          fontFamily: f.value,
-                          fontSize: f.previewSize ?? 13,
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-            <button
               onClick={() => setShowSetup(s => !s)}
               style={{ ...iconBtnStyle, color: showSetup ? '#aabbff' : '#aaa', fontSize: 16 }}
               title={tl('chatConfigBtn')}
@@ -481,7 +435,7 @@ export function Chat() {
                         }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                            <span style={{ fontFamily: 'sans-serif', fontWeight: 600, fontSize: 14, color: isSelected ? '#eee' : '#aaa' }}>
+                            <span style={{ fontFamily: 'inherit', fontWeight: 600, fontSize: 14, color: isSelected ? '#eee' : '#aaa' }}>
                               {p.label}
                             </span>
                             {p.id === currentProvider && (
@@ -510,7 +464,7 @@ export function Chat() {
                                       color: selectedModel === m.id ? '#aabbff' : '#777',
                                       cursor: 'pointer',
                                       fontSize: 12,
-                                      fontFamily: 'sans-serif',
+                                      fontFamily: 'inherit',
                                     }}
                                   >
                                     <span style={{ fontWeight: 600 }}>{m.label}</span>
@@ -705,7 +659,7 @@ const outerStyle: React.CSSProperties = {
   width: '100%', height: '100%',
   display: 'flex',
   background: '#0d0d1e',
-  fontFamily: 'sans-serif',
+  fontFamily: 'inherit',
 };
 
 const sidebarStyle: React.CSSProperties = {
@@ -793,7 +747,7 @@ const dropdownItemStyle: React.CSSProperties = {
   cursor: 'pointer',
   padding: '10px 14px',
   textAlign: 'left',
-  fontFamily: 'sans-serif',
+  fontFamily: 'inherit',
   fontSize: 13,
   borderBottom: '1px solid #1a1a30',
 };
@@ -901,7 +855,7 @@ const inputStyle: React.CSSProperties = {
   background: '#141430',
   border: '1px solid #2a2a50',
   color: '#eee',
-  fontFamily: 'sans-serif',
+  fontFamily: 'inherit',
   fontSize: '15px',
   outline: 'none',
 };
@@ -973,17 +927,3 @@ export const CHAT_FONTS: { label: string; value: string; previewSize?: number }[
   { label: 'Sans-serif',      value: 'sans-serif',                   previewSize: 14 },
   { label: 'Monospace',       value: 'monospace',                    previewSize: 13 },
 ];
-
-const fontDropdownStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: 'calc(100% + 6px)',
-  right: 0,
-  zIndex: 50,
-  background: 'rgba(8,8,24,0.98)',
-  border: '1px solid rgba(80,80,180,0.4)',
-  minWidth: 180,
-  boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
-  display: 'flex',
-  flexDirection: 'column',
-  overflow: 'hidden',
-};

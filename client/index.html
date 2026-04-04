@@ -16,10 +16,11 @@
         padding: 0;
         box-sizing: border-box;
       }
+      :root { --app-font: sans-serif; }
       body {
         background: #1a1a2e;
         color: #eee;
-        font-family: sans-serif;
+        font-family: var(--app-font, sans-serif);
         overflow: hidden;
         width: 100vw;
         height: 100vh;

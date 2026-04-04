@@ -8,6 +8,7 @@ const T = {
     navPlay: '🎮 Brincar',
     navChat: '💬 Chat',
     navStats: '📊 Stats',
+    navFontPicker: 'Trocar fonte',
     // Garden
     loading: 'Carregando...',
     noBuddyTitle: 'seu buddy ainda não nasceu',
@@ -122,9 +123,26 @@ const T = {
     // Play mode
     playPet: 'Acariciar',
     playFetch: 'Buscar!',
+    playTrick: 'Truque!',
     playFetching: 'está procurando...',
+    playNoBuddy: 'seu buddy ainda não nasceu',
+    // Stats — labels hardcoded
+    statsHat: 'chapéu',
+    statsArchetype: 'arquétipo',
+    statsAttributes: 'atributos',
+    statsEvolution: 'evolução',
+    statsActivity: 'atividade',
+    statsPico: '▲ pico',
+    statsVale: '▼ vale',
+    statsByBuddy: 'via Buddy',
+    statsByClaude: 'via Claude',
+    statsSessionsLabel: 'sessões',
+    statsStreakLabel: 'sequência',
     // Buddy mode
     buddyMsgHint: 'Clique no pet ou envie uma mensagem',
+    // Stats — extra
+    statsMsgsLabel: 'mensagens',
+    statsPersonality: 'personalidade',
   },
   en: {
     // Nav
@@ -133,6 +151,7 @@ const T = {
     navPlay: '🎮 Play',
     navChat: '💬 Chat',
     navStats: '📊 Stats',
+    navFontPicker: 'Change font',
     // Garden
     loading: 'Loading...',
     noBuddyTitle: "your buddy hasn't hatched yet",
@@ -247,9 +266,26 @@ const T = {
     // Play mode
     playPet: 'Pet',
     playFetch: 'Fetch!',
+    playTrick: 'Trick!',
     playFetching: 'is searching...',
+    playNoBuddy: "your buddy hasn't hatched yet",
+    // Stats — labels hardcoded
+    statsHat: 'hat',
+    statsArchetype: 'archetype',
+    statsAttributes: 'attributes',
+    statsEvolution: 'evolution',
+    statsActivity: 'activity',
+    statsPico: '▲ peak',
+    statsVale: '▼ valley',
+    statsByBuddy: 'via Buddy',
+    statsByClaude: 'via Claude',
+    statsSessionsLabel: 'sessions',
+    statsStreakLabel: 'streak',
     // Buddy mode
     buddyMsgHint: 'Click the pet or send a message',
+    // Stats — extra
+    statsMsgsLabel: 'messages',
+    statsPersonality: 'personality',
   },
 } as const;
 

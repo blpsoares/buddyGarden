@@ -126,7 +126,7 @@ const titleBar: CSSProperties = {
 const toolIcon: CSSProperties = { fontSize: 14 };
 
 const titleText: CSSProperties = {
-  fontFamily: 'sans-serif',
+  fontFamily: 'inherit',
   fontSize: 13,
 };
 
@@ -172,7 +172,7 @@ function btn(type: 'deny' | 'allow' | 'always'): CSSProperties {
   };
   const c = colors[type];
   return {
-    fontFamily: 'sans-serif',
+    fontFamily: 'inherit',
     fontSize: 12,
     padding: '5px 12px',
     background: c.bg,

@@ -8,6 +8,7 @@ import { DragonBuddy, type DragonAnim } from '../components/DragonBuddy.tsx';
 import { BuddySprite } from '../components/BuddySprite.tsx';
 import { DragonNightBackground } from '../backgrounds/DragonBackground.tsx';
 import { RarityBadge } from '../components/RarityBadge.tsx';
+import { useT } from '../hooks/useT.ts';
 import type { Page } from '../App.tsx';
 
 type PlayState =
@@ -157,6 +158,7 @@ interface Props {
 
 export function PlayMode({ onNavigate }: Props) {
   const { data } = useBuddy();
+  const tl = useT();
   const [playState, setPlayState] = useState<PlayState>('idle');
   const [hearts, setHearts] = useState<Heart[]>([]);
   const [speechBubble, setSpeechBubble] = useState('');
@@ -325,7 +327,7 @@ export function PlayMode({ onNavigate }: Props) {
       <div style={centerStyle}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🥚</div>
-          <span style={pixelText(10)}>seu buddy ainda não nasceu</span>
+          <span style={pixelText(10)}>{tl('playNoBuddy')}</span>
         </div>
       </div>
     );
@@ -425,7 +427,7 @@ export function PlayMode({ onNavigate }: Props) {
         {/* Speech bubble */}
         {speechBubble && (
           <div style={speechBubbleStyle}>
-            <span style={{ fontFamily: 'sans-serif', fontSize: 13, color: '#eee', lineHeight: 1.4 }}>
+            <span style={{ fontFamily: 'inherit', fontSize: 13, color: '#eee', lineHeight: 1.4 }}>
               {speechBubble}
             </span>
             <div style={bubbleTailStyle} />
@@ -465,15 +467,15 @@ export function PlayMode({ onNavigate }: Props) {
           <div style={actionsStyle}>
             <button onClick={handlePet} style={actionBtn('#4a6e4a', '#7aaa7a')}>
               <span style={{ fontSize: 20 }}>🤚</span>
-              <span style={pixelText(7)}>acariciar</span>
+              <span style={pixelText(7)}>{tl('playPet')}</span>
             </button>
             <button onClick={handleFetch} style={actionBtn('#6e4a2a', '#aa8a5a')}>
               <span style={{ fontSize: 20 }}>🦴</span>
-              <span style={pixelText(7)}>buscar!</span>
+              <span style={pixelText(7)}>{tl('playFetch')}</span>
             </button>
             <button onClick={handleTrick} style={actionBtn('#4a2a6e', '#8a5aaa')}>
               <span style={{ fontSize: 20 }}>🎪</span>
-              <span style={pixelText(7)}>truque!</span>
+              <span style={pixelText(7)}>{tl('playTrick')}</span>
             </button>
           </div>
         )}
@@ -481,8 +483,8 @@ export function PlayMode({ onNavigate }: Props) {
         {/* Status durante fetch */}
         {playState === 'fetching' && (
           <div style={{ textAlign: 'center', marginTop: 20 }}>
-            <span style={{ fontFamily: 'sans-serif', fontSize: 13, color: '#555' }}>
-              {petName} está por aí...
+            <span style={{ fontFamily: 'inherit', fontSize: 13, color: '#555' }}>
+              {petName} {tl('playFetching')}
             </span>
           </div>
         )}

@@ -94,7 +94,7 @@ export function ProjectPicker({ onClose, onAdd, onRemove, currentDirs }: Props) 
         </div>
 
         {error && (
-          <div style={{ padding: '6px 12px', color: '#f88', fontSize: 12, fontFamily: 'sans-serif' }}>
+          <div style={{ padding: '6px 12px', color: '#f88', fontSize: 12, fontFamily: 'inherit' }}>
             {error}
           </div>
         )}
@@ -238,7 +238,7 @@ const listStyle: React.CSSProperties = {
 const loadingStyle: React.CSSProperties = {
   padding: '20px',
   textAlign: 'center',
-  fontFamily: 'sans-serif',
+  fontFamily: 'inherit',
   fontSize: 12,
   color: '#555',
 };
@@ -267,7 +267,7 @@ function entryBtnStyle(active: boolean): React.CSSProperties {
     cursor: 'pointer',
     padding: '9px 14px',
     textAlign: 'left',
-    fontFamily: 'sans-serif',
+    fontFamily: 'inherit',
     fontSize: 13,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -284,7 +284,7 @@ const selectBtnStyle: React.CSSProperties = {
   color: '#7a7',
   cursor: 'pointer',
   padding: '9px 14px',
-  fontFamily: 'sans-serif',
+  fontFamily: 'inherit',
   fontSize: 14,
   fontWeight: 700,
   flexShrink: 0,
@@ -297,7 +297,7 @@ const removeBtnStyle: React.CSSProperties = {
   color: '#a77',
   cursor: 'pointer',
   padding: '9px 14px',
-  fontFamily: 'sans-serif',
+  fontFamily: 'inherit',
   fontSize: 13,
   flexShrink: 0,
 };
@@ -309,7 +309,7 @@ const currentSelectBtnStyle = (disabled: boolean): React.CSSProperties => ({
   border: `1px solid ${disabled ? 'rgba(40,40,60,0.4)' : 'rgba(80,160,80,0.6)'}`,
   color: disabled ? '#444' : '#cfeecf',
   cursor: disabled ? 'not-allowed' : 'pointer',
-  fontFamily: 'sans-serif',
+  fontFamily: 'inherit',
   fontSize: 12,
   fontWeight: 600,
   whiteSpace: 'nowrap',

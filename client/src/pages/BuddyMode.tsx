@@ -191,10 +191,10 @@ export function BuddyMode({ onNavigate }: Props) {
           {bones && <RarityBadge rarity={bones.rarity} />}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
-          <span style={{ fontFamily: 'sans-serif', fontSize: 11, color: '#aaa' }}>
+          <span style={{ fontFamily: 'inherit', fontSize: 11, color: '#aaa' }}>
             {MOOD_EMOJI[mood] ?? '😊'} {mood}
           </span>
-          <span style={{ fontFamily: 'sans-serif', fontSize: 10, color: '#555' }}>
+          <span style={{ fontFamily: 'inherit', fontSize: 10, color: '#555' }}>
             {data.level} · {data.xp.toLocaleString()} xp
           </span>
         </div>
@@ -247,7 +247,7 @@ export function BuddyMode({ onNavigate }: Props) {
                         style={{ fontSize: 13, lineHeight: 1.5 }}
                       />
                     ) : (
-                      <span style={{ fontFamily: 'sans-serif', fontSize: 13, color: '#eee', lineHeight: 1.5 }}>
+                      <span style={{ fontFamily: 'inherit', fontSize: 13, color: '#eee', lineHeight: 1.5 }}>
                         {msg.content}
                       </span>
                     )}
@@ -305,7 +305,7 @@ export function BuddyMode({ onNavigate }: Props) {
       {/* ── Hint quando sem mensagens ── */}
       {!hasMessages && petState === 'idle' && (
         <div style={hintStyle}>
-          <span style={{ fontFamily: 'sans-serif', fontSize: 11, color: '#444' }}>
+          <span style={{ fontFamily: 'inherit', fontSize: 11, color: '#444' }}>
             {tl('buddyMsgHint')}
           </span>
         </div>
@@ -478,7 +478,7 @@ const inputStyle: React.CSSProperties = {
   background: 'rgba(12,12,32,0.95)',
   border: '1px solid rgba(80,80,180,0.45)',
   color: '#eee',
-  fontFamily: 'sans-serif',
+  fontFamily: 'inherit',
   fontSize: 14,
   outline: 'none',
 };

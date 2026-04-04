@@ -4,7 +4,7 @@ import { BuddySprite } from '../components/BuddySprite.tsx';
 import { DragonBuddy } from '../components/DragonBuddy.tsx';
 import { RarityBadge } from '../components/RarityBadge.tsx';
 import { useT } from '../hooks/useT.ts';
-import type { BuddyBones } from '../hooks/useBuddy.ts';
+import type { TKey } from '../i18n.ts';
 
 interface SourceStats {
   sessionsToday: number;
@@ -38,12 +38,12 @@ const TIER_LABELS: Record<string, string> = {
   Ancient:   '🌟 Ancient',
 };
 
-const STAT_META: Array<{ key: keyof BuddyStats; label: string; icon: string; color: string }> = [
-  { key: 'debugging', label: 'Debugging', icon: '🔍', color: '#4a9edb' },
-  { key: 'patience',  label: 'Paciência',  icon: '🌿', color: '#4caf50' },
-  { key: 'chaos',     label: 'Caos',       icon: '🌀', color: '#f44336' },
-  { key: 'wisdom',    label: 'Sabedoria',  icon: '🦉', color: '#9c27b0' },
-  { key: 'snark',     label: 'Sarcasmo',   icon: '🌶', color: '#ff9800' },
+const STAT_META: Array<{ key: keyof BuddyStats; i18nKey: TKey; icon: string; color: string }> = [
+  { key: 'debugging', i18nKey: 'statsDebugging', icon: '🔍', color: '#4a9edb' },
+  { key: 'patience',  i18nKey: 'statsPatience',  icon: '🌿', color: '#4caf50' },
+  { key: 'chaos',     i18nKey: 'statsChaos',     icon: '🌀', color: '#f44336' },
+  { key: 'wisdom',    i18nKey: 'statsWisdom',    icon: '🦉', color: '#9c27b0' },
+  { key: 'snark',     i18nKey: 'statsSnark',     icon: '🌶', color: '#ff9800' },
 ];
 
 const HAT_LABELS: Record<string, string> = {
@@ -130,7 +130,7 @@ function AnimatedBar({ value, color, label, icon }: { value: number; color: stri
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={{ fontSize: 13, width: 18, textAlign: 'center', flexShrink: 0 }}>{icon}</span>
-      <span style={{ fontFamily: 'sans-serif', fontSize: 12, color: '#666', width: 64, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontFamily: 'inherit', fontSize: 12, color: '#666', width: 64, flexShrink: 0 }}>{label}</span>
       <div style={{ flex: 1, height: 10, background: '#1a1a2e', border: '1px solid #2a2a4a', overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${width}%`, background: color, transition: 'width 0.7s ease-out' }} />
       </div>
@@ -183,7 +183,7 @@ function ActivityChart({ last7Days }: { last7Days: number[] }) {
         {days.map((d, i) => (
           <div key={i} style={{
             flex: 1, textAlign: 'center',
-            fontFamily: 'sans-serif', fontSize: 9,
+            fontFamily: 'inherit', fontSize: 9,
             color: d.isToday ? '#4a9edb' : '#333',
           }}>
             {d.label}
@@ -287,21 +287,21 @@ export function Stats() {
             <div style={{ borderTop: '1px solid #1e1e3a', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
               <Row label={tl('statsSpecies')} value={bones?.species ?? '—'} />
               <Row label={tl('statsRarity')} value={bones?.rarity ?? '—'} />
-              <Row label="chapéu" value={HAT_LABELS[bones?.hat ?? 'none'] ?? '—'} />
+              <Row label={tl('statsHat')} value={HAT_LABELS[bones?.hat ?? 'none'] ?? '—'} />
             </div>
 
             {archetype && (
               <div style={{ borderTop: '1px solid #1e1e3a', paddingTop: 10 }}>
-                <div style={{ fontFamily: 'sans-serif', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>arquétipo</div>
-                <div style={{ fontFamily: 'sans-serif', fontSize: 14, color: '#c0c8ff', fontWeight: 'bold', marginBottom: 3 }}>{archetype.name}</div>
-                <div style={{ fontFamily: 'sans-serif', fontSize: 11, color: '#555', lineHeight: 1.5 }}>{archetype.desc}</div>
+                <div style={{ fontFamily: 'inherit', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>{tl('statsArchetype')}</div>
+                <div style={{ fontFamily: 'inherit', fontSize: 14, color: '#c0c8ff', fontWeight: 'bold', marginBottom: 3 }}>{archetype.name}</div>
+                <div style={{ fontFamily: 'inherit', fontSize: 11, color: '#555', lineHeight: 1.5 }}>{archetype.desc}</div>
               </div>
             )}
           </div>
 
           {/* Coluna direita: spider chart + barras compactas */}
           <div style={{ ...cardStyle, flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ fontFamily: 'sans-serif', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em' }}>atributos</div>
+            <div style={{ fontFamily: 'inherit', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{tl('statsAttributes')}</div>
 
             <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
               {bones?.stats && <SpiderChart stats={bones.stats as BuddyStats} size={160} />}
@@ -312,14 +312,14 @@ export function Stats() {
                     <AnimatedBar
                       value={bones.stats[m.key] ?? 0}
                       color={m.color}
-                      label={m.label}
+                      label={tl(m.i18nKey)}
                       icon={m.icon}
                     />
                     {m.key === peakStat && (
-                      <div style={{ fontFamily: 'sans-serif', fontSize: 9, color: '#4caf50', marginTop: 2, marginLeft: 88 }}>▲ pico</div>
+                      <div style={{ fontFamily: 'inherit', fontSize: 9, color: '#4caf50', marginTop: 2, marginLeft: 88 }}>{tl('statsPico')}</div>
                     )}
                     {m.key === valleyStat && (
-                      <div style={{ fontFamily: 'sans-serif', fontSize: 9, color: '#f44336', marginTop: 2, marginLeft: 88 }}>▼ vale</div>
+                      <div style={{ fontFamily: 'inherit', fontSize: 9, color: '#f44336', marginTop: 2, marginLeft: 88 }}>{tl('statsVale')}</div>
                     )}
                   </div>
                 ))}
@@ -333,10 +333,10 @@ export function Stats() {
 
           {/* Evolução */}
           <div style={{ ...cardStyle, flex: '0 0 220px' }}>
-            <div style={{ fontFamily: 'sans-serif', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>evolução</div>
+            <div style={{ fontFamily: 'inherit', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>{tl('statsEvolution')}</div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-              <span style={{ fontFamily: 'sans-serif', fontSize: 13, color: '#aabbff' }}>{tierLabel}</span>
+              <span style={{ fontFamily: 'inherit', fontSize: 13, color: '#aabbff' }}>{tierLabel}</span>
               <span style={{ fontFamily: '"Press Start 2P", monospace', fontSize: 9, color: '#4a4a8a' }}>{xpPct}%</span>
             </div>
 
@@ -345,8 +345,8 @@ export function Stats() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontFamily: 'sans-serif', fontSize: 12, color: '#666' }}>{data.xp.toLocaleString('pt-BR')} XP</span>
-              <span style={{ fontFamily: 'sans-serif', fontSize: 12, color: '#444' }}>/{data.xpForNextLevel.toLocaleString('pt-BR')}</span>
+              <span style={{ fontFamily: 'inherit', fontSize: 12, color: '#666' }}>{data.xp.toLocaleString('pt-BR')} XP</span>
+              <span style={{ fontFamily: 'inherit', fontSize: 12, color: '#444' }}>/{data.xpForNextLevel.toLocaleString('pt-BR')}</span>
             </div>
           </div>
 
@@ -354,7 +354,7 @@ export function Stats() {
           {sessions && (
             <div style={{ ...cardStyle, flex: 1 }}>
               {/* Título */}
-              <div style={{ fontFamily: 'sans-serif', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>atividade</div>
+              <div style={{ fontFamily: 'inherit', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>{tl('statsActivity')}</div>
 
               {/* Toggle de fonte — abaixo do título */}
               <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
@@ -367,7 +367,7 @@ export function Stats() {
                     background: view === v ? activeBg : 'transparent',
                     border: `1px solid ${view === v ? activeColor : '#2a2a3a'}`,
                     color: view === v ? activeColor : '#3a3a5a',
-                    fontFamily: 'sans-serif', fontSize: 10, fontWeight: view === v ? 'bold' : 'normal',
+                    fontFamily: 'inherit', fontSize: 10, fontWeight: view === v ? 'bold' : 'normal',
                     padding: '4px 12px', cursor: 'pointer',
                     textTransform: 'uppercase', letterSpacing: '0.08em',
                     transition: 'all 0.15s',
@@ -394,13 +394,13 @@ export function Stats() {
                 sessions.claude
                   ? <>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
-                        <StatChip value={sessions.claude.sessionsToday} label="sessões hoje" color="#4a9edb" />
-                        <StatChip value={sessions.claude.sessionsTotal} label="sessões total" color="#2196f3" />
-                        <StatChip value={sessions.claude.messagesTotal} label="mensagens" color="#9c27b0" unit="" />
+                        <StatChip value={sessions.claude.sessionsToday} label={`${tl('statsSessionsLabel')} ${tl('statsSessionsToday')}`} color="#4a9edb" />
+                        <StatChip value={sessions.claude.sessionsTotal} label={`${tl('statsSessionsLabel')} ${tl('statsSessionsTotal')}`} color="#2196f3" />
+                        <StatChip value={sessions.claude.messagesTotal} label={tl('statsMsgsLabel')} color="#9c27b0" unit="" />
                       </div>
                       <ActivityChart last7Days={sessions.claude.last7Days} />
                     </>
-                  : <div style={{ color: '#444', fontFamily: 'sans-serif', fontSize: 12, padding: '20px 0' }}>
+                  : <div style={{ color: '#444', fontFamily: 'inherit', fontSize: 12, padding: '20px 0' }}>
                       Reinicie o servidor para ver os dados do Claude separados.
                     </div>
               )}
@@ -410,13 +410,13 @@ export function Stats() {
                 sessions.buddy
                   ? <>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
-                        <StatChip value={sessions.buddy.sessionsToday} label="chats hoje" color="#e91e63" />
-                        <StatChip value={sessions.buddy.sessionsTotal} label="chats total" color="#c2185b" />
-                        <StatChip value={sessions.buddy.messagesTotal} label="mensagens" color="#9c27b0" unit="" />
+                        <StatChip value={sessions.buddy.sessionsToday} label={`chats ${tl('statsSessionsToday')}`} color="#e91e63" />
+                        <StatChip value={sessions.buddy.sessionsTotal} label={`chats ${tl('statsSessionsTotal')}`} color="#c2185b" />
+                        <StatChip value={sessions.buddy.messagesTotal} label={tl('statsMsgsLabel')} color="#9c27b0" unit="" />
                       </div>
                       <ActivityChart last7Days={sessions.buddy.last7Days} />
                     </>
-                  : <div style={{ color: '#444', fontFamily: 'sans-serif', fontSize: 12, padding: '20px 0' }}>
+                  : <div style={{ color: '#444', fontFamily: 'inherit', fontSize: 12, padding: '20px 0' }}>
                       Reinicie o servidor para ver os dados do Buddy separados.
                     </div>
               )}
@@ -427,8 +427,8 @@ export function Stats() {
         {/* ── ROW 3: Personalidade ──────────────────────────────────── */}
         {soul?.personality && (
           <div style={cardStyle}>
-            <div style={{ fontFamily: 'sans-serif', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>personalidade</div>
-            <p style={{ fontFamily: 'sans-serif', fontSize: 14, color: '#bbb', lineHeight: 1.7, margin: 0 }}>
+            <div style={{ fontFamily: 'inherit', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>{tl('statsPersonality')}</div>
+            <p style={{ fontFamily: 'inherit', fontSize: 14, color: '#bbb', lineHeight: 1.7, margin: 0 }}>
               {soul.personality}
             </p>
           </div>
@@ -448,8 +448,8 @@ export function Stats() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-      <span style={{ fontFamily: 'sans-serif', fontSize: 11, color: '#555', textTransform: 'capitalize' }}>{label}</span>
-      <span style={{ fontFamily: 'sans-serif', fontSize: 11, color: '#888', textAlign: 'right' }}>{value}</span>
+      <span style={{ fontFamily: 'inherit', fontSize: 11, color: '#555', textTransform: 'capitalize' }}>{label}</span>
+      <span style={{ fontFamily: 'inherit', fontSize: 11, color: '#888', textAlign: 'right' }}>{value}</span>
     </div>
   );
 }
@@ -466,7 +466,7 @@ function StatChip({ value, label, color, unit = 'sessões' }: { value: number; l
       <div style={{ fontFamily: '"Press Start 2P", monospace', fontSize: 18, color, lineHeight: 1, marginBottom: 6 }}>
         {value}
       </div>
-      <div style={{ fontFamily: 'sans-serif', fontSize: 10, color: '#555', textTransform: 'uppercase' }}>{label}</div>
+      <div style={{ fontFamily: 'inherit', fontSize: 10, color: '#555', textTransform: 'uppercase' }}>{label}</div>
     </div>
   );
 }

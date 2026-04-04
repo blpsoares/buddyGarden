@@ -65,7 +65,7 @@ function parseBlocks(text: string): ReactNode[] {
           const level = h3 ? 3 : h2 ? 2 : 1;
           const text = (h3 ?? h2 ?? h1)![1]!;
           const hs: CSSProperties = {
-            fontFamily: 'sans-serif',
+            fontFamily: 'inherit',
             fontWeight: 700,
             fontSize: level === 1 ? 16 : level === 2 ? 14 : 13,
             color: '#ddd',
@@ -161,7 +161,7 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const baseStyle: CSSProperties = {
-  fontFamily: 'sans-serif',
+  fontFamily: 'inherit',
   fontSize: 14,
   lineHeight: 1.6,
   color: '#eee',
@@ -207,5 +207,5 @@ const ulStyle: CSSProperties = {
   paddingLeft: 20,
   color: '#ddd',
   fontSize: 14,
-  fontFamily: 'sans-serif',
+  fontFamily: 'inherit',
 };
