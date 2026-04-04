@@ -3,11 +3,11 @@ export type Lang = 'pt' | 'en';
 const T = {
   pt: {
     // Nav
-    navGarden: '🌱 Jardim',
-    navBuddy: '🐾 Buddy',
-    navPlay: '🎮 Brincar',
-    navChat: '💬 Chat',
-    navStats: '📊 Stats',
+    navGarden: 'Jardim',
+    navBuddy: 'Buddy',
+    navPlay: 'Brincar',
+    navChat: 'Chat',
+    navStats: 'Stats',
     navFontPicker: 'Trocar fonte',
     // Garden
     loading: 'Carregando...',
@@ -138,19 +138,42 @@ const T = {
     statsByClaude: 'via Claude',
     statsSessionsLabel: 'sessões',
     statsStreakLabel: 'sequência',
+    statsNoClaudeData: 'Reinicie o servidor para ver os dados do Claude separados.',
+    statsNoBuddyData: 'Reinicie o servidor para ver os dados do Buddy separados.',
     // Buddy mode
     buddyMsgHint: 'Clique no pet ou envie uma mensagem',
     // Stats — extra
     statsMsgsLabel: 'mensagens',
     statsPersonality: 'personalidade',
+    // Stats — activity toggle
+    statsActivityAll: 'Tudo',
+    // Stats — provider badge
+    statsProviderActive: 'ativo',
+    // Stats — tier labels
+    tierHatchling: '🥚 Hatchling',
+    tierJuvenile: '🐣 Jovem',
+    tierAdult: '🐾 Adulto',
+    tierElder: '✨ Ancião',
+    tierAncient: '🌟 Ancestral',
+    // Stats — archetype names
+    archetypeDetective: 'O Detetive',
+    archetypeDetectiveDesc: 'Metódico, preciso, não descansa até encontrar a causa raiz.',
+    archetypeWise: 'O Sábio',
+    archetypeWiseDesc: 'Calmo sob pressão, sempre disposto a explicar pela décima vez.',
+    archetypeTrickster: 'O Trickster',
+    archetypeTricksterDesc: 'Imprevisível e criativo — quebra padrões por princípio.',
+    archetypeOracle: 'O Oráculo',
+    archetypeOracleDesc: 'Pensa antes de falar, mas quando fala, vale muito ouvir.',
+    archetypeCritic: 'O Crítico',
+    archetypeCriticDesc: 'Honesto até doer — mas no fundo só quer que o código fique bom.',
   },
   en: {
     // Nav
-    navGarden: '🌱 Garden',
-    navBuddy: '🐾 Buddy',
-    navPlay: '🎮 Play',
-    navChat: '💬 Chat',
-    navStats: '📊 Stats',
+    navGarden: 'Garden',
+    navBuddy: 'Buddy',
+    navPlay: 'Play',
+    navChat: 'Chat',
+    navStats: 'Stats',
     navFontPicker: 'Change font',
     // Garden
     loading: 'Loading...',
@@ -281,11 +304,34 @@ const T = {
     statsByClaude: 'via Claude',
     statsSessionsLabel: 'sessions',
     statsStreakLabel: 'streak',
+    statsNoClaudeData: 'Restart the server to see Claude data separately.',
+    statsNoBuddyData: 'Restart the server to see Buddy data separately.',
     // Buddy mode
     buddyMsgHint: 'Click the pet or send a message',
     // Stats — extra
     statsMsgsLabel: 'messages',
     statsPersonality: 'personality',
+    // Stats — activity toggle
+    statsActivityAll: 'All',
+    // Stats — provider badge
+    statsProviderActive: 'active',
+    // Stats — tier labels
+    tierHatchling: '🥚 Hatchling',
+    tierJuvenile: '🐣 Juvenile',
+    tierAdult: '🐾 Adult',
+    tierElder: '✨ Elder',
+    tierAncient: '🌟 Ancient',
+    // Stats — archetype names
+    archetypeDetective: 'The Detective',
+    archetypeDetectiveDesc: 'Methodical, precise — won\'t rest until the root cause is found.',
+    archetypeWise: 'The Sage',
+    archetypeWiseDesc: 'Calm under pressure, always willing to explain one more time.',
+    archetypeTrickster: 'The Trickster',
+    archetypeTricksterDesc: 'Unpredictable and creative — breaks patterns on principle.',
+    archetypeOracle: 'The Oracle',
+    archetypeOracleDesc: 'Thinks before speaking, but when they speak, it\'s worth listening.',
+    archetypeCritic: 'The Critic',
+    archetypeCriticDesc: 'Brutally honest — but deep down just wants the code to be good.',
   },
 } as const;
 

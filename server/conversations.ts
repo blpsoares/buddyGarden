@@ -132,18 +132,7 @@ async function openInTerminal(sessionId: string, cwd: string): Promise<boolean> 
   const safeDir = cwd.replace(/'/g, "'\\''");
   const cmd = `cd '${safeDir}' && claude --resume ${sessionId}`;
 
-  // Tentativa 1: WSL2 → Windows Terminal
-  try {
-    const proc = Bun.spawn(
-      ['cmd.exe', '/c', `start "" wt.exe -- wsl.exe -- bash -c "${cmd.replace(/"/g, '\\"')}"`],
-      { stdout: 'pipe', stderr: 'pipe', stdin: null },
-    );
-    // Não esperamos a conclusão (terminal fica aberto); sucesso se não lançou exceção
-    void proc.exited;
-    return true;
-  } catch { /* WSL2 não disponível */ }
-
-  // Tentativa 2: x-terminal-emulator (Linux desktop)
+  // Tentativa 1: x-terminal-emulator (Linux desktop)
   try {
     Bun.spawn(
       ['x-terminal-emulator', '-e', `bash -c "${cmd.replace(/"/g, '\\"')}"`],
@@ -152,7 +141,7 @@ async function openInTerminal(sessionId: string, cwd: string): Promise<boolean> 
     return true;
   } catch { /* ignora */ }
 
-  // Tentativa 3: gnome-terminal
+  // Tentativa 2: gnome-terminal
   try {
     Bun.spawn(
       ['gnome-terminal', '--', 'bash', '-c', `${cmd}; exec bash`],
@@ -172,9 +161,10 @@ export async function exportConversationToFile(
   const messages = getConversation(id);
   if (messages.length === 0) return null;
 
-  // Lê projectDir desta conversa específica (ou homedir como fallback)
+  // Lê projectDirs desta conversa específica (ou homedir como fallback)
   const meta = getConversationMeta(id);
-  const cwd = meta?.projectDir ?? homedir();
+  const projectDirs = getConversationProjectDirs(meta);
+  const cwd = projectDirs[0] ?? homedir();
 
   // Claude nomeia dirs substituindo '/' e '.' por '-'
   const projectHash = cwd.replace(/[/.]/g, '-');

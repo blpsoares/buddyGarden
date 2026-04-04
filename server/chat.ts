@@ -47,6 +47,7 @@ function buildSystemPrompt(
   provider: string = 'anthropic',
   lang: 'pt' | 'en' = 'pt',
   projectContext?: string,
+  projectDirs?: string[],
 ): string {
   const name = soul?.name ?? 'Buddy';
   const personality = soul?.personality ?? 'friendly and curious';
@@ -85,7 +86,7 @@ ${cliExtra}
 
 ${sessionCtx}
 
-${langInstruction}${projectContext ? `\n\n---\n\n${projectContext}` : ''}`;
+${langInstruction}${projectDirs?.length ? `\n\nPASTA(S) DE TRABALHO DO USUÁRIO: ${projectDirs.join(', ')}` : ''}${projectContext ? `\n\n---\n\n${projectContext}` : ''}`;
 }
 
 // ── Backend: Anthropic SDK ────────────────────────────────────────────────────
@@ -297,7 +298,7 @@ export async function streamChat(
   projectDirs?: string[],
 ): Promise<void> {
   const config = readChatConfig();
-  const system = buildSystemPrompt(soul, bones, stats, config.provider, lang, projectContext);
+  const system = buildSystemPrompt(soul, bones, stats, config.provider, lang, projectContext, projectDirs);
   history = compressHistory(history);
 
   switch (config.provider) {

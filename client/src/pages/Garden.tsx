@@ -24,7 +24,7 @@ interface SceneLayer {
   groundTop: string; // linha de grama/solo
   particles?: string; // CSS classe para partículas
   deco: Array<{ emoji: string; style: React.CSSProperties }>;
-  label: string;
+  label: { pt: string; en: string };
 }
 
 // helpers: bottom:'H%' = colado no horizonte, top:'X%' = no céu
@@ -35,7 +35,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#2d005a',
     ground: 'linear-gradient(180deg, #1a0038 0%, #0d001e 100%)',
     groundTop: '#4a00aa',
-    label: '🏰 Castelo das Sombras',
+    label: { pt: 'Castelo das Sombras', en: 'Shadow Castle' },
     deco: [], // SVG background handles all decorations
   },
   ghost: {
@@ -43,7 +43,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#0c0e20',
     ground: 'linear-gradient(180deg, #0a0b18 0%, #050610 100%)',
     groundTop: '#1a1c3a',
-    label: '👻 Mansão Mal-Assombrada',
+    label: { pt: 'Mansão Mal-Assombrada', en: 'Haunted Mansion' },
     deco: [
       { emoji: '🏚️', style: { right: '6%', bottom: H, fontSize: '80px', opacity: 0.5 } },
       { emoji: '🌕', style: { left: '15%', top: '8%', fontSize: '52px', opacity: 0.55 } },
@@ -57,7 +57,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#060620',
     ground: 'linear-gradient(180deg, #0a0a20 0%, #050510 100%)',
     groundTop: '#1414408',
-    label: '🤖 Cidade Neon',
+    label: { pt: 'Cidade Neon', en: 'Neon City' },
     deco: [
       { emoji: '🌆', style: { right: '2%', bottom: H, fontSize: '90px', opacity: 0.45 } },
       { emoji: '🌃', style: { left: '2%', bottom: H, fontSize: '70px', opacity: 0.35 } },
@@ -71,7 +71,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#001838',
     ground: 'linear-gradient(180deg, #001228 0%, #000918 100%)',
     groundTop: '#003060',
-    label: '🌊 Abissal Profundo',
+    label: { pt: 'Abissal Profundo', en: 'Deep Abyss' },
     deco: [
       { emoji: '🪸', style: { left: '6%', bottom: H, fontSize: '56px', opacity: 0.75 } },
       { emoji: '🪸', style: { right: '8%', bottom: H, fontSize: '44px', opacity: 0.6 } },
@@ -85,7 +85,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#001228',
     ground: 'linear-gradient(180deg, #000f20 0%, #000810 100%)',
     groundTop: '#002848',
-    label: '🐟 Aquário Encantado',
+    label: { pt: 'Aquário Encantado', en: 'Enchanted Aquarium' },
     deco: [
       { emoji: '🌿', style: { left: '4%', bottom: H, fontSize: '52px', opacity: 0.85 } },
       { emoji: '🌿', style: { right: '5%', bottom: H, fontSize: '44px', opacity: 0.75 } },
@@ -99,7 +99,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#daeeff',
     ground: 'linear-gradient(180deg, #e8f4ff 0%, #cce0f8 100%)',
     groundTop: '#aaccee',
-    label: '🧊 Ártico Gelado',
+    label: { pt: 'Ártico Gelado', en: 'Frozen Arctic' },
     deco: [
       { emoji: '🧊', style: { left: '8%', bottom: H, fontSize: '52px', opacity: 0.8 } },
       { emoji: '🧊', style: { right: '10%', bottom: H, fontSize: '40px', opacity: 0.65 } },
@@ -114,7 +114,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#e06018',
     ground: 'linear-gradient(180deg, #c47830 0%, #8a5018 100%)',
     groundTop: '#d48830',
-    label: '🌵 Deserto do Pôr do Sol',
+    label: { pt: 'Deserto do Pôr do Sol', en: 'Sunset Desert' },
     deco: [
       { emoji: '🌵', style: { left: '5%', bottom: H, fontSize: '64px', opacity: 0.85 } },
       { emoji: '🌵', style: { right: '6%', bottom: H, fontSize: '80px', opacity: 0.75 } },
@@ -128,7 +128,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#183010',
     ground: 'linear-gradient(180deg, #152808 0%, #0c1a04 100%)',
     groundTop: '#2a5010',
-    label: '🍄 Floresta Mágica',
+    label: { pt: 'Floresta Mágica', en: 'Magic Forest' },
     deco: [
       { emoji: '🍄', style: { left: '5%', bottom: H, fontSize: '56px', opacity: 0.85 } },
       { emoji: '🍄', style: { right: '6%', bottom: H, fontSize: '44px', opacity: 0.75 } },
@@ -143,7 +143,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#080e18',
     ground: 'linear-gradient(180deg, #060c10 0%, #030608 100%)',
     groundTop: '#101828',
-    label: '🌙 Floresta Noturna',
+    label: { pt: 'Floresta Noturna', en: 'Night Forest' },
     deco: [
       { emoji: '🌳', style: { left: '2%', bottom: H, fontSize: '80px', opacity: 0.55 } },
       { emoji: '🌳', style: { right: '4%', bottom: H, fontSize: '68px', opacity: 0.45 } },
@@ -159,7 +159,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#7ec8f0',
     ground: 'linear-gradient(180deg, #5ab85a 0%, #3a9830 100%)',
     groundTop: '#6aca6a',
-    label: '🌸 Prado Florido',
+    label: { pt: 'Prado Florido', en: 'Flower Meadow' },
     deco: [
       { emoji: '🌸', style: { left: '4%', bottom: H, fontSize: '40px', opacity: 0.9 } },
       { emoji: '🌷', style: { left: '18%', bottom: H, fontSize: '32px', opacity: 0.85 } },
@@ -175,7 +175,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#7ec8f0',
     ground: 'linear-gradient(180deg, #4a9848 0%, #306828 100%)',
     groundTop: '#60b058',
-    label: '🦆 Margem do Lago',
+    label: { pt: 'Margem do Lago', en: 'Lakeside' },
     deco: [
       { emoji: '🌊', style: { right: '5%', bottom: H, fontSize: '60px', opacity: 0.65 } },
       { emoji: '🌿', style: { left: '5%', bottom: H, fontSize: '44px', opacity: 0.85 } },
@@ -189,7 +189,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#7ec8f0',
     ground: 'linear-gradient(180deg, #4a9848 0%, #306828 100%)',
     groundTop: '#60b058',
-    label: '🪿 Margem do Rio',
+    label: { pt: 'Margem do Rio', en: 'Riverside' },
     deco: [
       { emoji: '🌊', style: { right: '5%', bottom: H, fontSize: '56px', opacity: 0.6 } },
       { emoji: '🌿', style: { left: '4%', bottom: H, fontSize: '44px', opacity: 0.8 } },
@@ -202,7 +202,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#1a5018',
     ground: 'linear-gradient(180deg, #1e5810 0%, #103808 100%)',
     groundTop: '#2a7018',
-    label: '🌿 Selva Tropical',
+    label: { pt: 'Selva Tropical', en: 'Tropical Jungle' },
     deco: [
       { emoji: '🌴', style: { left: '2%', bottom: H, fontSize: '80px', opacity: 0.8 } },
       { emoji: '🌴', style: { right: '4%', bottom: H, fontSize: '96px', opacity: 0.7 } },
@@ -216,7 +216,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#50aae0',
     ground: 'linear-gradient(180deg, #d8b850 0%, #aa8828 100%)',
     groundTop: '#e0c060',
-    label: '🏖️ Praia Ensolarada',
+    label: { pt: 'Praia Ensolarada', en: 'Sunny Beach' },
     deco: [
       { emoji: '🌊', style: { right: '2%', bottom: H, fontSize: '64px', opacity: 0.65 } },
       { emoji: '⛱️', style: { left: '8%', bottom: H, fontSize: '52px', opacity: 0.8 } },
@@ -229,7 +229,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#354858',
     ground: 'linear-gradient(180deg, #2e4820 0%, #1e3010 100%)',
     groundTop: '#3a5828',
-    label: '🌧️ Jardim na Chuva',
+    label: { pt: 'Jardim na Chuva', en: 'Rainy Garden' },
     deco: [
       { emoji: '🌿', style: { left: '4%', bottom: H, fontSize: '52px', opacity: 0.85 } },
       { emoji: '🌿', style: { right: '6%', bottom: H, fontSize: '40px', opacity: 0.75 } },
@@ -243,7 +243,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#e07830',
     ground: 'linear-gradient(180deg, #7a4018 0%, #502808 100%)',
     groundTop: '#8a4e20',
-    label: '🏠 Tarde Aconchegante',
+    label: { pt: 'Tarde Aconchegante', en: 'Cozy Afternoon' },
     deco: [
       { emoji: '🏠', style: { right: '8%', bottom: H, fontSize: '68px', opacity: 0.6 } },
       { emoji: '🌅', style: { left: '12%', top: '8%', fontSize: '48px', opacity: 0.5 } },
@@ -256,7 +256,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#e07830',
     ground: 'linear-gradient(180deg, #7a4018 0%, #502808 100%)',
     groundTop: '#8a4e20',
-    label: '😸 Cantinho do Gordão',
+    label: { pt: 'Cantinho do Gordão', en: 'The Chonk Corner' },
     deco: [
       { emoji: '🛋️', style: { right: '10%', bottom: H, fontSize: '64px', opacity: 0.6 } },
       { emoji: '🐟', style: { left: '12%', bottom: H, fontSize: '30px', opacity: 0.7 } },
@@ -269,7 +269,7 @@ const SCENES: Record<string, SceneLayer> = {
     horizon: '#081018',
     ground: 'linear-gradient(180deg, #081410 0%, #040c08 100%)',
     groundTop: '#102820',
-    label: '🫧 Caverna Luminosa',
+    label: { pt: 'Caverna Luminosa', en: 'Glowing Cave' },
     deco: [
       { emoji: '💎', style: { left: '6%', bottom: H, fontSize: '36px', opacity: 0.75 } },
       { emoji: '💎', style: { right: '8%', bottom: H, fontSize: '28px', opacity: 0.65 } },
@@ -285,7 +285,7 @@ const DEFAULT_SCENE: SceneLayer = {
   horizon: '#78c0ee',
   ground: 'linear-gradient(180deg, #58b058 0%, #388830 100%)',
   groundTop: '#68c060',
-  label: '🌱 Jardim',
+  label: { pt: 'Jardim', en: 'Garden' },
   deco: [
     { emoji: '☁️', style: { left: '25%', top: '12%', fontSize: '36px', opacity: 0.6 } },
     { emoji: '☁️', style: { left: '62%', top: '7%', fontSize: '26px', opacity: 0.5 } },
@@ -305,7 +305,7 @@ const ALL_SPECIES = ['duck','goose','cat','rabbit','owl','penguin','turtle','sna
 export function Garden({ onNavigate }: Props) {
   const { data, loading } = useBuddy();
   const {
-    messages, send, isStreaming, conversationId, newConversation, persistQuickChat,
+    messages, send, isStreaming, conversationId, newConversation, persistQuickChat, lang,
   } = useSharedChat();
   const tl = useT();
 
@@ -571,7 +571,7 @@ export function Garden({ onNavigate }: Props) {
       {/* ── Label do cenário ── */}
       <div style={{ position: 'absolute', top: 6, right: 8, zIndex: 5 }}>
         <span style={{ fontFamily: 'inherit', fontSize: '10px', color: 'rgba(255,255,255,0.45)' }}>
-          {scene.label}
+          {scene.label[lang as 'pt' | 'en']}
         </span>
       </div>
 

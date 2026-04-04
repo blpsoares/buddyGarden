@@ -30,12 +30,12 @@ interface BuddyStats {
   snark: number;
 }
 
-const TIER_LABELS: Record<string, string> = {
-  Hatchling: '🥚 Hatchling',
-  Juvenile:  '🐣 Juvenile',
-  Adult:     '🐾 Adult',
-  Elder:     '✨ Elder',
-  Ancient:   '🌟 Ancient',
+const TIER_KEYS: Record<string, TKey> = {
+  Hatchling: 'tierHatchling',
+  Juvenile:  'tierJuvenile',
+  Adult:     'tierAdult',
+  Elder:     'tierElder',
+  Ancient:   'tierAncient',
 };
 
 const STAT_META: Array<{ key: keyof BuddyStats; i18nKey: TKey; icon: string; color: string }> = [
@@ -52,12 +52,12 @@ const HAT_LABELS: Record<string, string> = {
   top: '🎩 Cartola', flower: '🌸 Flor', halo: '😇 Halo',
 };
 
-const PEAK_ARCHETYPE: Record<string, { name: string; desc: string }> = {
-  debugging: { name: 'O Detetive',  desc: 'Metódico, preciso, não descansa até encontrar a causa raiz.' },
-  patience:  { name: 'O Sábio',     desc: 'Calmo sob pressão, sempre disposto a explicar pela décima vez.' },
-  chaos:     { name: 'O Trickster', desc: 'Imprevisível e criativo — quebra padrões por princípio.' },
-  wisdom:    { name: 'O Oráculo',   desc: 'Pensa antes de falar, mas quando fala, vale muito ouvir.' },
-  snark:     { name: 'O Crítico',   desc: 'Honesto até doer — mas no fundo só quer que o código fique bom.' },
+const PEAK_ARCHETYPE: Record<string, { nameKey: TKey; descKey: TKey }> = {
+  debugging: { nameKey: 'archetypeDetective', descKey: 'archetypeDetectiveDesc' },
+  patience:  { nameKey: 'archetypeWise',      descKey: 'archetypeWiseDesc' },
+  chaos:     { nameKey: 'archetypeTrickster', descKey: 'archetypeTricksterDesc' },
+  wisdom:    { nameKey: 'archetypeOracle',    descKey: 'archetypeOracleDesc' },
+  snark:     { nameKey: 'archetypeCritic',    descKey: 'archetypeCriticDesc' },
 };
 
 // ── Spider Chart ───────────────────────────────────────────────────────────────
@@ -253,7 +253,7 @@ export function Stats() {
     ? Math.round(((data.xp - data.xpForCurrentLevel) / (data.xpForNextLevel - data.xpForCurrentLevel)) * 100)
     : 100;
 
-  const tierLabel = TIER_LABELS[data.level] ?? data.level;
+  const tierLabel = tl(TIER_KEYS[data.level] ?? 'tierHatchling');
 
   return (
     <div style={containerStyle}>
@@ -293,8 +293,8 @@ export function Stats() {
             {archetype && (
               <div style={{ borderTop: '1px solid #1e1e3a', paddingTop: 10 }}>
                 <div style={{ fontFamily: 'inherit', fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>{tl('statsArchetype')}</div>
-                <div style={{ fontFamily: 'inherit', fontSize: 14, color: '#c0c8ff', fontWeight: 'bold', marginBottom: 3 }}>{archetype.name}</div>
-                <div style={{ fontFamily: 'inherit', fontSize: 11, color: '#555', lineHeight: 1.5 }}>{archetype.desc}</div>
+                <div style={{ fontFamily: 'inherit', fontSize: 14, color: '#c0c8ff', fontWeight: 'bold', marginBottom: 3 }}>{tl(archetype.nameKey)}</div>
+                <div style={{ fontFamily: 'inherit', fontSize: 11, color: '#555', lineHeight: 1.5 }}>{tl(archetype.descKey)}</div>
               </div>
             )}
           </div>
@@ -359,7 +359,7 @@ export function Stats() {
               {/* Toggle de fonte — abaixo do título */}
               <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
                 {([
-                  { v: 'all'    as StatsView, label: 'Tudo',   activeColor: '#4a4aaa', activeBg: '#1a1a3a' },
+                  { v: 'all'    as StatsView, label: tl('statsActivityAll'), activeColor: '#4a4aaa', activeBg: '#1a1a3a' },
                   { v: 'claude' as StatsView, label: 'Claude', activeColor: '#4a9edb', activeBg: '#0a1a2a' },
                   { v: 'buddy'  as StatsView, label: 'Buddy',  activeColor: '#e91e63', activeBg: '#2a0a1a' },
                 ]).map(({ v, label, activeColor, activeBg }) => (
@@ -401,7 +401,7 @@ export function Stats() {
                       <ActivityChart last7Days={sessions.claude.last7Days} />
                     </>
                   : <div style={{ color: '#444', fontFamily: 'inherit', fontSize: 12, padding: '20px 0' }}>
-                      Reinicie o servidor para ver os dados do Claude separados.
+                      {tl('statsNoClaudeData')}
                     </div>
               )}
 
@@ -410,14 +410,14 @@ export function Stats() {
                 sessions.buddy
                   ? <>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
-                        <StatChip value={sessions.buddy.sessionsToday} label={`chats ${tl('statsSessionsToday')}`} color="#e91e63" />
-                        <StatChip value={sessions.buddy.sessionsTotal} label={`chats ${tl('statsSessionsTotal')}`} color="#c2185b" />
+                        <StatChip value={sessions.buddy.sessionsToday} label={`${tl('statsByBuddy')} ${tl('statsSessionsToday')}`} color="#e91e63" />
+                        <StatChip value={sessions.buddy.sessionsTotal} label={`${tl('statsByBuddy')} ${tl('statsSessionsTotal')}`} color="#c2185b" />
                         <StatChip value={sessions.buddy.messagesTotal} label={tl('statsMsgsLabel')} color="#9c27b0" unit="" />
                       </div>
                       <ActivityChart last7Days={sessions.buddy.last7Days} />
                     </>
                   : <div style={{ color: '#444', fontFamily: 'inherit', fontSize: 12, padding: '20px 0' }}>
-                      Reinicie o servidor para ver os dados do Buddy separados.
+                      {tl('statsNoBuddyData')}
                     </div>
               )}
             </div>

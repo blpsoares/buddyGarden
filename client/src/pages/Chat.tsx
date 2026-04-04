@@ -625,7 +625,6 @@ export function Chat() {
             value={input}
             onChange={e => setInput(e.target.value)}
             placeholder={isStreaming ? tl('chatWaiting') : tl('chatPlaceholder')}
-            disabled={isStreaming}
             style={inputStyle}
             autoFocus
           />
