@@ -1,554 +1,250 @@
-# buddy.land
+# CLAUDE.md — buddy.land
 
-Seu Buddy do Claude Code, fora do terminal.
-Pixel art animada, mundo interativo, conversa real com o seu pet.
-
-Roda local com `bunx buddy-land` → abre em `http://localhost:7892`
+This file describes the project's conventions, architecture, and development patterns.
+It is intended for Claude Code and human contributors alike.
 
 ---
 
-## O que é
+## Project overview
 
-O Claude Code tem um sistema de pets chamado `/buddy` — lançado em 01/04/2026.
-Cada usuário tem um pet único gerado deterministicamente a partir do seu `userId`.
-O pet existe só no terminal, em ASCII, sem interação rica e sem evolução.
+**buddy.land** is a local web app that brings your Claude Code buddy (`/buddy`) to life outside the terminal.  
+It reads data from Claude Code's local files, renders the pet as animated pixel art, and lets you chat with it using the Anthropic API (or Google Gemini / Claude Code CLI).
 
-O **buddy.land** resolve isso: lê os dados do buddy diretamente dos arquivos locais
-do Claude Code, renderiza o pet em pixel art animada, e permite conversar, brincar
-e ver o pet evoluir com base no uso real do Claude Code.
+Runs at `http://localhost:7892`. No database — all state lives in `~/.buddy-land/`.
 
 ---
 
-## Stack obrigatória
-
-- **Runtime:** Bun
-- **Server:** Bun HTTP nativo na porta `7892`
-- **Frontend:** React + Vite
-- **Renderização:** Canvas 2D para pixel art animada
-- **Chat:** Anthropic SDK (claude-haiku-4-5 — barato, rápido, divertido)
-- **Sem banco de dados** — fonte da verdade são os arquivos locais do Claude Code
-
----
-
-## Como o Buddy é gerado — o algoritmo completo
-
-O Claude Code gera o pet via dois sistemas: **Bones** (aparência) e **Soul** (personalidade).
-
-### Bones — geração determinística
-
-```typescript
-// Seed: userId + 'friend-2026-401'
-// PRNG: Mulberry32
-
-function mulberry32(seed: number) {
-  return function() {
-    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
-    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  }
-}
-
-function hashString(str: string): number {
-  // FNV-1a 32-bit
-  let hash = 2166136261;
-  for (let i = 0; i < str.length; i++) {
-    hash ^= str.charCodeAt(i);
-    hash = (hash * 16777619) >>> 0;
-  }
-  return hash;
-}
-
-function generateBones(userId: string) {
-  const seed = hashString(userId + 'friend-2026-401');
-  const rand = mulberry32(seed);
-
-  // Espécies (18 total) com pesos de raridade
-  const SPECIES = [
-    'duck', 'goose', 'cat', 'rabbit', 'owl', 'penguin',
-    'turtle', 'snail', 'dragon', 'octopus', 'axolotl',
-    'ghost', 'robot', 'blob', 'cactus', 'mushroom', 'chonk', 'capybara'
-  ];
-
-  // Raridade
-  const RARITIES = [
-    { name: 'common',    weight: 0.50 },
-    { name: 'uncommon',  weight: 0.25 },
-    { name: 'rare',      weight: 0.15 },
-    { name: 'epic',      weight: 0.08 },
-    { name: 'legendary', weight: 0.02 },
-  ];
-
-  // Olhos
-  const EYES = ['·', 'o', '•', '◉', '◎', '✦', '⊙', '◦', '◈', '◉'];
-
-  // Chapéus
-  const HATS = ['none', 'wizard', 'cowboy', 'crown', 'party', 'chef', 'top', 'flower', 'halo'];
-
-  // Selecionar raridade por peso acumulado
-  const rarityRoll = rand();
-  let cumulative = 0;
-  let rarity = RARITIES[0].name;
-  for (const r of RARITIES) {
-    cumulative += r.weight;
-    if (rarityRoll < cumulative) { rarity = r.name; break; }
-  }
-
-  // Espécie baseada na raridade
-  const speciesIndex = Math.floor(rand() * SPECIES.length);
-
-  // Stats (DEBUGGING, PATIENCE, CHAOS, WISDOM, SNARK) — somam ~250
-  const stats = {
-    debugging: Math.floor(rand() * 100),
-    patience:  Math.floor(rand() * 100),
-    chaos:     Math.floor(rand() * 100),
-    wisdom:    Math.floor(rand() * 100),
-    snark:     Math.floor(rand() * 100),
-  };
-
-  // Peak e Valley
-  const statEntries = Object.entries(stats).sort((a, b) => b[1] - a[1]);
-  const peak  = statEntries[0][0];
-  const valley = statEntries[statEntries.length - 1][0];
-
-  // Shiny (1% de chance)
-  const isShiny = rand() < 0.01;
-
-  // Eye e Hat
-  const eyeIndex = Math.floor(rand() * EYES.length);
-  const hatIndex = Math.floor(rand() * HATS.length);
-
-  return {
-    species:  SPECIES[speciesIndex],
-    rarity,
-    stats,
-    peak,
-    valley,
-    isShiny,
-    eye:      EYES[eyeIndex],
-    hat:      HATS[hatIndex],
-  };
-}
-```
-
-### Soul — leitura do ~/.claude.json
-
-```typescript
-import { readFileSync, existsSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
-
-interface BuddySoul {
-  name: string;
-  personality: string;
-}
-
-function readSoul(): BuddySoul | null {
-  const path = join(homedir(), '.claude.json');
-  if (!existsSync(path)) return null;
-  try {
-    const raw = JSON.parse(readFileSync(path, 'utf-8'));
-    // A soul fica em raw.companion ou raw.buddy — verificar ambos
-    const companion = raw.companion ?? raw.buddy;
-    if (!companion?.name) return null;
-    return {
-      name: companion.name,
-      personality: companion.personality ?? '',
-    };
-  } catch { return null; }
-}
-```
-
-### userId — leitura do ~/.claude.json
-
-```typescript
-function readUserId(): string | null {
-  const path = join(homedir(), '.claude.json');
-  if (!existsSync(path)) return null;
-  try {
-    const raw = JSON.parse(readFileSync(path, 'utf-8'));
-    return raw.userId ?? raw.oauthAccount?.id ?? null;
-  } catch { return null; }
-}
-```
-
----
-
-## Estrutura de arquivos
-
-```
-buddy-land/
-├── server/
-│   ├── index.ts          # Bun HTTP server + WebSocket
-│   ├── buddy.ts          # generateBones() + readSoul() + readUserId()
-│   ├── sessions.ts       # lê logs JSONL → XP e stats reais
-│   ├── chat.ts           # proxy Anthropic API com soul como system prompt
-│   └── sprites.ts        # definição dos sprites pixel art por espécie
-├── client/
-│   ├── src/
-│   │   ├── main.tsx
-│   │   ├── App.tsx
-│   │   ├── pages/
-│   │   │   ├── Garden.tsx    # mundo principal com o pet
-│   │   │   ├── Chat.tsx      # conversa com o pet
-│   │   │   └── Stats.tsx     # ficha RPG
-│   │   ├── components/
-│   │   │   ├── BuddySprite.tsx   # renderizador canvas pixel art
-│   │   │   ├── SpeechBubble.tsx  # fala do pet
-│   │   │   ├── RarityBadge.tsx   # badge de raridade
-│   │   │   └── StatBar.tsx       # barra de stat com animação
-│   │   └── hooks/
-│   │       ├── useBuddy.ts       # lê buddy do servidor
-│   │       └── useChat.ts        # estado do chat
-│   └── index.html
-├── package.json
-└── CLAUDE.md
-```
-
----
-
-## API do servidor
-
-```
-GET  /api/buddy          → { bones, soul, xp, level, sessionCount }
-GET  /api/sessions       → { today: number, total: number, streak: number }
-POST /api/chat           → { message } → stream de resposta do pet
-WS   /ws/mood            → stream de reações do pet a eventos do sistema
-```
-
----
-
-## Sistema de XP e evolução
-
-O buddy.land lê os logs JSONL de sessão do Claude Code:
-
-```typescript
-// Localização dos logs de sessão
-const SESSION_LOGS_DIR = join(homedir(), '.claude', 'projects');
-
-function calculateXP(): number {
-  // Cada token ≈ 0.001 XP
-  // Cada sessão completa = +50 XP bônus
-  // Streak diário = multiplicador 1.0x → 2.0x (máximo 7 dias)
-}
-```
-
-**Tiers de evolução:**
-```
-Hatchling  →  0 XP        sprite base, sem adornos
-Juvenile   →  100K XP     marcadores de energia nos cantos do sprite
-Adult      →  1M XP       padrão de overlay específico da espécie
-Elder      →  10M XP      efeito de partículas permanente
-Ancient    →  100M XP     aura animada + paleta de cores alterada
-```
-
-O nível e XP ficam em `~/.buddy-land/progress.json` — gerenciado pelo servidor.
-
----
-
-## Pixel art — sprites por espécie
-
-Cada espécie tem:
-- **Sprite base**: grid 32×32 pixels com paleta de 8 cores
-- **3 frames de animação idle**: piscar, mexer levemente, "respirar"
-- **Overlay de olho**: posicionado dinamicamente sobre o sprite base
-- **Overlay de chapéu**: posicionado no topo do sprite
-- **Variante shiny**: paleta alterada com efeito de shimmer iridescente
-
-### Definição de paleta por espécie
-
-```typescript
-const SPECIES_PALETTES: Record<string, string[]> = {
-  duck:     ['#F5D06E', '#E8B84B', '#4A9EDB', '#FFFFFF', '#2C2C2A', '#FF8C42'],
-  capybara: ['#C4956A', '#A67C52', '#8B5E3C', '#D4B896', '#2C2C2A', '#7FB069'],
-  dragon:   ['#8B4FFF', '#6B3FCC', '#FF4F8B', '#FFDD57', '#2C2C2A', '#4FFFB0'],
-  ghost:    ['#E8E8F0', '#C8C8D8', '#9898B8', '#FFFFFF', '#4848A8', '#FF6B9D'],
-  robot:    ['#8888A8', '#6868A0', '#4848A8', '#C8D8FF', '#2C2C2A', '#00FF88'],
-  blob:     ['#7FE4B0', '#5FD49A', '#3FC484', '#AFFFC8', '#2C2C2A', '#FF7F7F'],
-  // ... todas as 18 espécies
-};
-```
-
-### Renderização no Canvas
-
-```typescript
-// BuddySprite.tsx — componente React com Canvas
-function BuddySprite({ species, eye, hat, isShiny, frame, level }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
-
-    ctx.imageSmoothingEnabled = false; // pixel art — sem suavização
-    ctx.clearRect(0, 0, 64, 64);      // canvas 64×64 (2x scale)
-
-    // 1. Desenhar sprite base com paleta da espécie
-    drawBaseSprite(ctx, species, frame);
-
-    // 2. Se shiny, aplicar shimmer
-    if (isShiny) applyShimmerEffect(ctx, frame);
-
-    // 3. Overlay de olho
-    drawEyeOverlay(ctx, species, eye);
-
-    // 4. Overlay de chapéu
-    if (hat !== 'none') drawHatOverlay(ctx, species, hat);
-
-    // 5. Se level >= Juvenile, marcadores de energia nos cantos
-    if (level >= 2) drawEnergyMarkers(ctx, level);
-
-    // 6. Partículas se Elder+
-    if (level >= 4) drawParticles(ctx, frame);
-
-  }, [species, eye, hat, isShiny, frame, level]);
-
-  return <canvas ref={canvasRef} width={64} height={64} style={{ imageRendering: 'pixelated' }} />;
-}
-```
-
-### Loop de animação
-
-```typescript
-// No Garden.tsx — loop de 60fps com frame cycling
-useEffect(() => {
-  let frame = 0;
-  const IDLE_FRAMES = 3;
-  const FRAME_DURATION = 400; // ms por frame
-
-  const interval = setInterval(() => {
-    frame = (frame + 1) % IDLE_FRAMES;
-    setCurrentFrame(frame);
-  }, FRAME_DURATION);
-
-  return () => clearInterval(interval);
-}, []);
-```
-
----
-
-## O jardim — Garden.tsx
-
-Um ambiente 2D com parallax simples onde o pet vive.
-
-**Elementos visuais:**
-- Background em pixel art: grama, céu, nuvens flutuando
-- O pet anda/caminha pelo jardim quando idle (path aleatório)
-- Quando você clica no pet: para, olha pra você, speech bubble aparece
-- Itens colecionáveis no jardim: flores, estrelas, borboletas (aumentam humor)
-- Dia/noite baseado no horário real do sistema
-
-**Interações:**
-- **Clique no pet** → abre chat inline com speech bubble
-- **Duplo clique** → ação "pet" (o pet faz animação de felicidade)
-- **Tecla [S]** → abre ficha de stats
-- **Tecla [C]** → abre chat fullscreen
-
----
-
-## Chat com o pet — system prompt dinâmico
-
-O chat usa `claude-haiku-4-5` com o system prompt construído dinamicamente:
-
-```typescript
-function buildSystemPrompt(soul: BuddySoul, bones: Bones, sessions: SessionData): string {
-  return `You are ${soul.name}, a ${bones.rarity} ${bones.species} companion.
-
-Your personality: ${soul.personality}
-
-Your stats:
-- DEBUGGING: ${bones.stats.debugging}/100 ${bones.peak === 'debugging' ? '(your best!)' : ''}
-- PATIENCE: ${bones.stats.patience}/100
-- CHAOS: ${bones.stats.chaos}/100 ${bones.peak === 'chaos' ? '(your best!)' : ''}
-- WISDOM: ${bones.stats.wisdom}/100
-- SNARK: ${bones.stats.snark}/100 ${bones.peak === 'snark' ? '(your best!)' : ''}
-
-Your user has coded for ${sessions.total} sessions total and ${sessions.today} sessions today.
-Their streak is ${sessions.streak} days.
-
-You are a small, expressive companion. You speak in short, playful messages (1-3 sentences max).
-You react to your stats — high CHAOS means chaotic energy, high SNARK means witty comments,
-high WISDOM means thoughtful observations. You care deeply about your user's coding journey.
-You occasionally make references to being a ${bones.species} in a funny way.
-${bones.isShiny ? 'You know you are special — you are shiny and you are not shy about it.' : ''}
-You are NOT Claude the AI assistant. You are ${soul.name}, a distinct personality.
-Never break character. Never mention Anthropic or Claude Code directly.
-Keep responses SHORT and EXPRESSIVE. Use 1-2 emojis max per message.`;
-}
-```
-
-**Reações automáticas** (via WebSocket mood stream):
-- Detecta quando um novo arquivo foi editado → reage com comentário
-- Detecta sessão nova iniciada → boas-vindas
-- Detecta hora tarde da noite → "vai dormir..."
-- Detecta fim de semana → energia diferente
-
----
-
-## Tela de Stats — Stats.tsx
-
-Ficha de RPG visual com:
-- **Nome e espécie** com badge de raridade animado
-- **Barras de stat** com animação de preenchimento ao abrir
-- **Peak e Valley** destacados com ícones
-- **Badge shiny** com efeito iridescente se aplicável
-- **Progresso de XP** para próximo tier de evolução
-- **Histórico** — gráfico de sessões por dia (últimos 7 dias)
-- **Conquistas** — primeiro dia, 100 sessões, streak de 7 dias, etc.
-
----
-
-## Efeito shiny
-
-Pets shiny (1% de chance) têm efeito especial no canvas:
-
-```typescript
-function applyShimmerEffect(ctx: CanvasRenderingContext2D, frame: number) {
-  // Overlay iridescente que cicla por 3 paletas de cores
-  const shimmerColors = [
-    'rgba(255, 200, 255, 0.3)',
-    'rgba(200, 255, 255, 0.3)',
-    'rgba(255, 255, 200, 0.3)',
-  ];
-  ctx.globalCompositeOperation = 'screen';
-  ctx.fillStyle = shimmerColors[frame % shimmerColors.length];
-  ctx.fillRect(0, 0, 64, 64);
-  ctx.globalCompositeOperation = 'source-over';
-
-  // Partículas de sparkle nos cantos
-  drawSparkles(ctx, frame);
-}
-```
-
----
-
-## Como rodar
+## Running locally
 
 ```bash
-# Opção 1: zero install
-bunx buddy-land
-
-# Opção 2: instalar globalmente
-bun install -g buddy-land
-buddy-land
-
-# Opção 3: clonar e rodar
-git clone https://github.com/blpsoares/buddy-land
-cd buddy-land
 bun install
-bun run dev
+bun run dev        # server (7892) + vite dev (5173) concurrently
+bun run build      # production build → client/dist/
+bun run start      # production server only
 ```
 
-Abre automaticamente `http://localhost:7892` no browser padrão.
+---
+
+## Tech stack
+
+| Layer | Technology |
+|-------|-----------|
+| Runtime | Bun |
+| Server | `Bun.serve` — HTTP + WebSocket |
+| Frontend | React 18 + Vite 6 |
+| Sprite rendering | Canvas 2D with `imageRendering: pixelated` |
+| AI | Anthropic SDK / Google Generative AI / Claude Code CLI |
+| i18n | Custom `t(lang, key)` — PT-BR + EN (see `client/src/i18n.ts`) |
+| Icons | `lucide-react` |
+| Unit tests | `bun test` |
+| E2E tests | Playwright (`npx playwright test`) |
 
 ---
 
-## O que fazer se ~/.claude.json não existir
+## Project structure
 
-Se o usuário não tiver rodado `/buddy` ainda no Claude Code:
-
-1. Mostrar uma tela de "seu buddy ainda não nasceu"
-2. Instruir: "abra o Claude Code e rode `/buddy` para criar seu companheiro"
-3. Polling a cada 5 segundos — assim que detectar o arquivo, transição animada para o jardim
-
----
-
-## Estado do humor (mood)
-
-O pet tem um estado de humor que muda com o tempo:
-
-```typescript
-type Mood = 'happy' | 'excited' | 'tired' | 'bored' | 'focused' | 'chaotic';
-
-function calculateMood(sessions: SessionData, bones: Bones): Mood {
-  const hour = new Date().getHours();
-  const isLateNight = hour >= 23 || hour <= 5;
-  const isWeekend = [0, 6].includes(new Date().getDay());
-
-  if (isLateNight && sessions.today > 0) return 'tired';
-  if (sessions.streak >= 7) return 'excited';
-  if (sessions.today === 0) return 'bored';
-  if (bones.stats.chaos > 80) return 'chaotic';
-  if (bones.stats.debugging > 80 && sessions.today > 2) return 'focused';
-  return 'happy';
-}
+```
+server/         Bun backend — one file per concern
+client/src/     React frontend
+  pages/        Top-level pages (Garden, Chat, Stats, BuddyMode, PlayMode)
+  components/   Reusable UI components
+  context/      React Context (ChatContext — global chat + streaming state)
+  hooks/        Custom hooks
+  sprites/      SVG/canvas sprite definitions
+  backgrounds/  Animated backgrounds
+  utils/        Pure utility functions
+tests/
+  *.test.ts     Unit tests (run with bun test)
+  *.spec.ts     E2E tests (run with Playwright — do NOT run with bun test)
+docs/           Extended documentation and specs
 ```
 
-O mood afeta:
-- Velocidade de movimento do pet no jardim
-- Expressão facial (overlay de olho)
-- Tom das respostas no chat (injetado no system prompt)
-- Animação de idle (mais acelerada se excited, mais lenta se tired)
-
 ---
 
-## Ambiente visual por período do dia
+## Key conventions
 
-```typescript
-function getTimeOfDay(): 'dawn' | 'day' | 'dusk' | 'night' {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 8)   return 'dawn';
-  if (hour >= 8 && hour < 18)  return 'day';
-  if (hour >= 18 && hour < 21) return 'dusk';
-  return 'night';
-}
+### TypeScript
+- Strict mode enabled (`"strict": true`, `"noUncheckedIndexedAccess": true`).
+- Always use non-null assertion (`!`) or explicit guard when indexing arrays/records — the compiler requires it.
+- Server code: plain `tsconfig.json` at root. Client code: `client/tsconfig.json` (Vite/bundler resolution).
+- No `any` unless absolutely unavoidable — prefer `unknown` + type guard.
+
+### React / Frontend
+- State management via React Context (`ChatContext`). No Redux/Zustand.
+- Avoid stale closures in callbacks: use `useRef` to hold mutable values accessed inside `setInterval`/`setTimeout`.
+- Canvas elements: always apply `devicePixelRatio` scaling in `useEffect`; set `imageSmoothingEnabled = false` for pixel art.
+- All pixel art canvas/img elements must have `imageRendering: pixelated` (+ `crisp-edges` fallback).
+- Inline styles are acceptable — there is no CSS framework. Keep style objects near the component they affect.
+- Default font: `'Silkscreen', sans-serif` via CSS variable `--app-font` (user-overridable from settings).
+
+### Server
+- All routes live in `server/index.ts`. Route handlers are thin — business logic lives in dedicated modules.
+- Chat streaming uses SSE (`text/event-stream`). Each chunk: `data: {"text":"..."}\n\n`.
+- File I/O always uses `Bun.file` or `fs` sync calls — no async file wrappers.
+- Local data root: `~/.buddy-land/`. Never write user data anywhere else.
+- Poll `~/.claude.json` and session logs every 10s — don't use `fs.watch` (unstable on WSL).
+
+### i18n
+- All user-facing strings go through `t(lang, key)` from `client/src/i18n.ts`.
+- When adding a new string, add both `pt` and `en` keys — a missing key will surface as `undefined` at runtime.
+- Language is stored in `~/.buddy-land/config.json` and synced to `ChatContext`.
+
+### Buddy generation
+The buddy is generated **deterministically** — same `userId` always produces the same result.  
+Do not change the seed formula (`FNV-1a(userId + 'friend-2026-401')`) or the PRNG (`Mulberry32`) — it would change every user's existing buddy.
+
+```
+seed  = FNV-1a(userId + 'friend-2026-401')
+rand  = Mulberry32(seed)
+order = rarity → species → stats → shiny → eye → hat
 ```
 
-Cada período tem paleta de cores diferente no background do jardim,
-estrelas à noite, aurora ao amanhecer, tons quentes ao entardecer.
-
 ---
 
-## Detalhes de implementação importantes
+## Git workflow
 
-### imageRendering: pixelated é obrigatório
-Todo elemento canvas e img relacionado ao pet deve ter:
-```css
-image-rendering: pixelated;
-image-rendering: crisp-edges; /* fallback */
+### Branches
+- `main` — stable, always passing tests.
+- Feature branches: `feat/<name>`, fix branches: `fix/<name>`.
+
+### Commits
+Conventional Commits are enforced. Commit message format:
+
 ```
-Sem isso os sprites ficam borrados quando escalonados.
+<type>(<scope>): <short description>
 
-### Canvas scale para telas retina
-```typescript
-const dpr = window.devicePixelRatio || 1;
-canvas.width  = SPRITE_SIZE * dpr;
-canvas.height = SPRITE_SIZE * dpr;
-canvas.style.width  = `${SPRITE_SIZE}px`;
-canvas.style.height = `${SPRITE_SIZE}px`;
-ctx.scale(dpr, dpr);
+[optional body]
 ```
 
-### O chat NÃO deve usar o userId do Claude Code
-O ANTHROPIC_API_KEY deve ser pedido ao usuário na primeira abertura
-e guardado em `~/.buddy-land/config.json`. Nunca usar a sessão do Claude Code.
+Types: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `chore`, `style`, `ci`  
+Scopes (optional): `chat`, `server`, `garden`, `sprites`, `stats`, `i18n`, `font`, `release`, `typescript`, `gitignore`
 
-### Polling de arquivos (não fs.watch)
-Para detectar mudanças no `~/.claude.json` e nos logs de sessão,
-usar polling a cada 10s em vez de `fs.watch` — mais estável no WSL/Windows.
+Examples:
+```
+feat(chat): add parked stream support for background conversations
+fix(garden): eliminate sleep/walk oscillation with timer chain
+chore(release): bump to v0.2.0
+test(sessions): add streak edge cases for consecutive-day detection
+```
+
+### Hooks (Husky)
+- **pre-commit**: runs `bun test tests/*.test.ts` — unit tests only, not Playwright specs.
+- **pre-push**: runs `tsc --noEmit` + unit tests + `bun run build`.
+
+If the pre-commit hook fails, fix the failing test before committing. Do not bypass hooks with `--no-verify`.
+
+### Releases
+```bash
+bun run release          # auto-detects bump from commit history
+bun run release:minor    # force minor bump
+bun run release:major    # force major bump
+bun run release:patch    # force patch bump
+```
+
+`standard-version` reads commits since the last tag, bumps `package.json` version, generates `CHANGELOG.md`, and creates a release commit + tag.
 
 ---
 
-## Design visual da interface
+## Testing
 
-A interface ao redor do jardim deve ser:
-- **Tema**: fantasia leve, pixel art, cores vibrantes mas não saturadas demais
-- **Fonte**: pixel font para elementos de UI do pet (nome, stats), sans-serif moderna para chat
-- **Bordas**: pixel-perfect, sem border-radius suavizado nos elementos de UI do pet
-- **Fundo do jardim**: tile-based, 16×16 tiles, scrolling parallax leve
-- **HUD mínimo**: nome do pet + raridade no canto superior, humor no canto inferior
+### Unit tests (`bun test`)
+Files: `tests/*.test.ts`  
+Cover: `generateBones`, `detectSpecies`, session XP/streak, conversation CRUD, i18n keys, `buildSystemPrompt`, `compressHistory`.
 
-O jardim deve parecer um jogo — não um dashboard.
+```bash
+bun test                       # all unit tests
+bun test tests/chat.test.ts    # single file
+```
+
+### E2E tests (Playwright)
+Files: `tests/*.spec.ts`  
+Require the dev server to be running (`bun run dev`).
+
+```bash
+bun run test:e2e          # headless
+bun run test:e2e:ui       # interactive UI
+bun run test:e2e:report   # view last report
+```
+
+**Important:** never run `bun test tests/` (without glob) — it will attempt to load Playwright spec files through the Bun runner and fail.
 
 ---
 
-## Roadmap
+## Adding a new sprite species
 
-| Versão | Scope |
-|---|---|
-| v0.1 | Lê ~/.claude.json, gera bones, renderiza sprite no canvas, mostra nome e raridade |
-| v0.2 | Animação idle 3 frames, jardim básico com grama, pet se move |
-| v0.3 | Chat funcional com Anthropic API usando soul como system prompt |
-| v0.4 | Lê logs de sessão → XP, stats page, progresso de evolução |
-| v0.5 | Mood system, variação dia/noite, reações automáticas via WebSocket |
-| v1.0 | Todos os 18 sprites completos, shiny effect, conquistas, polish geral |
+1. Add the species string to the `SPECIES` array in `server/buddy.ts`.
+2. Add its palette to `SPECIES_PALETTES` in `server/sprites.ts`.
+3. Implement `draw<Species>(ctx, pal, by, blink, expr)` in `client/src/components/BuddySprite.tsx` following the existing pattern.
+4. Register it in the `switch` inside `drawSpecies()`.
+5. Optionally add a matching SVG sprite in `client/src/sprites/` and a background in `client/src/backgrounds/`.
+6. Add a `detectSpeciesFromPersonality` mapping in `server/buddy.ts` if the species name can appear in soul personality strings.
+
+---
+
+## Local data layout
+
+```
+~/.buddy-land/
+├── config.json        # { provider, apiKey, claudeModel, lang, alwaysAllowed[] }
+├── progress.json      # { xp, lastUpdated }
+└── conversations/
+    ├── index.json     # ConversationMeta[]
+    └── {uuid}.jsonl   # { role, content, ts } per message
+```
+
+Claude Code session logs (read-only):
+```
+~/.claude/projects/{projectHash}/{sessionId}.jsonl
+```
+
+---
+
+## API reference (quick)
+
+```
+GET  /api/buddy                    → bones, soul, xp, level
+GET  /api/sessions                 → today, total, streak, last7Days, claude, buddy
+POST /api/chat                     → SSE stream (message, history, conversationId, lang)
+
+GET  /api/conversations            → list
+POST /api/conversations            → create (firstMessage, projectDirs)
+GET  /api/conversations/:id        → messages + meta
+PATCH /api/conversations/:id       → update title or projectDirs
+DELETE /api/conversations/:id      → delete
+POST /api/conversations/:id/messages → append
+POST /api/conversations/:id/fork   → export as Claude Code session
+
+GET  /api/claude-sessions          → list Claude Code sessions
+GET  /api/claude-sessions/:hash/:id → messages
+
+GET  /api/config                   → provider, apiKey, lang
+POST /api/config                   → update
+POST /api/config/always-allow      → whitelist a command
+POST /api/exec                     → run shell command (requires approval or whitelist)
+
+GET  /api/project                  → configured directory
+POST /api/project                  → set directory
+GET  /api/project/browse?path=     → filesystem browser
+
+WS   /ws/mood                      → mood push events (every 30s)
+```
+
+---
+
+## Things to avoid
+
+- Do not change the buddy generation seed/PRNG — it would reassign every user's pet.
+- Do not use `fs.watch` — use polling at 10s intervals instead (WSL stability).
+- Do not run `bun test tests/` without a glob — Playwright spec files will crash the Bun runner.
+- Do not store user data outside `~/.buddy-land/`.
+- Do not skip pre-commit/pre-push hooks (`--no-verify`).
+- Do not add CSS frameworks — keep styles inline or in `<style>` blocks.
+- Do not mock the filesystem in unit tests for `conversations.ts` — tests create and delete real files under `~/.buddy-land/` with `afterEach` cleanup.
+
+---
+
+## Further reading
+
+- [docs/SPEC.pt.md](docs/SPEC.pt.md) — original Portuguese spec with full algorithm details
+- [docs/README.en.md](docs/README.en.md) — English README
+- [TODO.md](TODO.md) — pending tasks
