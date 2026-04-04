@@ -113,7 +113,8 @@ describe('detectSpeciesFromPersonality', () => {
   it('detecta todas as espécies válidas', () => {
     for (const species of SPECIES_LIST) {
       const result = detectSpeciesFromPersonality(`I am a ${species}`);
-      expect(result).toBe(species);
+      expect(result).not.toBeNull();
+      expect(result!).toBe(species);
     }
   });
 
@@ -121,6 +122,6 @@ describe('detectSpeciesFromPersonality', () => {
     // O loop em SPECIES_LIST é ordenado — primeiro match ganha
     const result = detectSpeciesFromPersonality('duck and a ghost');
     expect(result).not.toBeNull();
-    expect(SPECIES_LIST).toContain(result);
+    if (result !== null) expect(SPECIES_LIST).toContain(result);
   });
 });

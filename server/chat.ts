@@ -213,7 +213,7 @@ async function streamViaCLI(
     let emittedLength = 0; // chars já enviados via onChunk
     let gotResult = false;
 
-    for await (const raw of proc.stdout) {
+    for await (const raw of proc.stdout as unknown as AsyncIterable<Uint8Array>) {
       lineBuffer += decoder.decode(raw, { stream: true });
       const lines = lineBuffer.split('\n');
       lineBuffer = lines.pop() ?? '';

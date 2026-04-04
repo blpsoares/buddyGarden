@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "noUncheckedIndexedAccess": false,
+    "moduleResolution": "bundler",
+    "types": ["bun", "@playwright/test"]
+  },
+  "exclude": []
+}

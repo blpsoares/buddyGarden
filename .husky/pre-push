@@ -1,7 +1,10 @@
 #!/bin/sh
 # Roda type-check + unit tests + build antes de push
-echo "🔍 Verificando tipos TypeScript..."
+echo "🔍 Verificando tipos TypeScript (server)..."
 bunx tsc --noEmit
+
+echo "🔍 Verificando tipos TypeScript (tests)..."
+bunx tsc --noEmit -p tests/tsconfig.json
 
 echo "🧪 Rodando testes unitários..."
 bun test tests/*.test.ts --timeout 30000
