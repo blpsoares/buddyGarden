@@ -21,6 +21,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { ArrowLeft, Send, Maximize2 } from 'lucide-react';
 import { useBuddy } from '../hooks/useBuddy.ts';
 import { useSharedChat } from '../context/ChatContext.tsx';
 import { DragonBuddy, type DragonAnim } from '../components/DragonBuddy.tsx';
@@ -184,7 +185,7 @@ export function BuddyMode({ onNavigate }: Props) {
       {/* ── HUD top ── */}
       <div style={hudTopStyle}>
         <button onClick={() => onNavigate('garden')} style={modeToggleBtn} title="Voltar ao jardim">
-          🌱
+          <ArrowLeft size={16} />
         </button>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
           <span style={pixelText(9)}>{petName}</span>
@@ -330,21 +331,24 @@ export function BuddyMode({ onNavigate }: Props) {
           disabled={isStreaming || !input.trim()}
           style={sendBtnStyle(isStreaming || !input.trim())}
         >
-          ▶
+          <Send size={14} />
         </button>
         <button
           type="button"
           onClick={() => onNavigate('chat')}
-          style={{ ...sendBtnStyle(false), background: 'rgba(30,30,70,0.9)', borderColor: 'rgba(80,80,180,0.4)', fontSize: 13 }}
+          style={{ ...sendBtnStyle(false), background: 'rgba(30,30,70,0.9)', borderColor: 'rgba(80,80,180,0.4)' }}
           title={tl('chatFullscreen')}
         >
-          ⛶
+          <Maximize2 size={14} />
         </button>
       </form>
 
       <style>{`
         @keyframes blink   { 0%,50%{opacity:1} 51%,100%{opacity:0} }
         @keyframes float   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
       `}</style>
     </div>
   );

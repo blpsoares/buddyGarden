@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { Plus, Trash2, ExternalLink, Settings, X, FolderPlus, Send, MoreHorizontal, Ghost, Eye } from 'lucide-react';
 import { useChat } from '../hooks/useChat.ts';
 import { useBuddy } from '../hooks/useBuddy.ts';
 import { BuddySprite } from '../components/BuddySprite.tsx';
@@ -214,14 +215,14 @@ export function Chat() {
                   newConversation(!isAnonymous);
                 }}
               >
-                {isAnonymous ? '👻' : '👁'}
+                {isAnonymous ? <Ghost size={13} /> : <Eye size={13} />}
               </button>
               <button
                 style={sidebarIconBtn(false)}
                 title={tl('chatNewConv')}
                 onClick={() => newConversation(isAnonymous)}
               >
-                ＋
+                <Plus size={13} />
               </button>
             </div>
           </div>
@@ -271,7 +272,7 @@ export function Chat() {
                     title="Opções"
                     onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === conv.id ? null : conv.id); }}
                   >
-                    ···
+                    <MoreHorizontal size={14} />
                   </button>
                   {openMenuId === conv.id && (
                     <div style={dropdownStyle} onClick={e => e.stopPropagation()}>
@@ -279,13 +280,15 @@ export function Chat() {
                         style={dropdownItemStyle}
                         onClick={e => { setOpenMenuId(null); void handleExportToClause(conv.id, e); }}
                       >
-                        ↗ Exportar para o Claude
+                        <ExternalLink size={12} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                        Exportar para o Claude
                       </button>
                       <button
                         style={{ ...dropdownItemStyle, color: '#ff6666' }}
                         onClick={() => { setOpenMenuId(null); void removeConversation(conv.id); }}
                       >
-                        🗑 Apagar sessão
+                        <Trash2 size={12} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                        Apagar sessão
                       </button>
                     </div>
                   )}
@@ -375,10 +378,10 @@ export function Chat() {
                 </span>
                 <button
                   onClick={() => void removeConvProjectDir(dir)}
-                  style={{ background: 'none', border: 'none', color: '#4a7a4a', cursor: 'pointer', padding: '0 0 0 2px', fontSize: 12, lineHeight: 1 }}
+                  style={{ background: 'none', border: 'none', color: '#4a7a4a', cursor: 'pointer', padding: '0 0 0 2px', display: 'flex', alignItems: 'center' }}
                   title={`Remover ${dir}`}
                 >
-                  ✕
+                  <X size={10} />
                 </button>
               </div>
             ))}
@@ -393,14 +396,14 @@ export function Chat() {
               }}
               title={tl('chatProjectBtn')}
             >
-              📁 <span style={{ fontSize: 11 }}>+</span>
+              <FolderPlus size={14} />
             </button>
             <button
               onClick={() => setShowSetup(s => !s)}
-              style={{ ...iconBtnStyle, color: showSetup ? '#aabbff' : '#aaa', fontSize: 16 }}
+              style={{ ...iconBtnStyle, color: showSetup ? '#aabbff' : '#aaa', display: 'flex', alignItems: 'center' }}
               title={tl('chatConfigBtn')}
             >
-              ⚙
+              <Settings size={15} strokeWidth={1.5} />
             </button>
           </div>
         </div>
@@ -410,7 +413,7 @@ export function Chat() {
           <div style={setupPanelStyle}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <span style={pixelText(10)}>{tl('chatConfigTitle')}</span>
-              <button onClick={() => setShowSetup(false)} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 18 }}>✕</button>
+              <button onClick={() => setShowSetup(false)} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><X size={16} /></button>
             </div>
 
             <form onSubmit={(e) => { void handleSaveConfig(e); }}>
@@ -629,9 +632,9 @@ export function Chat() {
           <button
             type="submit"
             disabled={isStreaming || !input.trim()}
-            style={sendBtnStyle(isStreaming || !input.trim())}
+            style={{ ...sendBtnStyle(isStreaming || !input.trim()), display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            ▶
+            <Send size={16} />
           </button>
         </form>
 
@@ -670,6 +673,7 @@ const sidebarStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
+  animation: 'slideInRight 0.18s ease-out',
 };
 
 const sidebarHeaderStyle: React.CSSProperties = {
@@ -738,6 +742,7 @@ const dropdownStyle: React.CSSProperties = {
   minWidth: 200,
   display: 'flex',
   flexDirection: 'column',
+  animation: 'fadeDown 0.15s ease-out',
 };
 
 const dropdownItemStyle: React.CSSProperties = {
@@ -786,6 +791,7 @@ const setupPanelStyle: React.CSSProperties = {
   padding: '16px 18px',
   overflowY: 'auto',
   maxHeight: '70vh',
+  animation: 'fadeDown 0.18s ease-out',
 };
 
 const providerCardStyle = (active: boolean): React.CSSProperties => ({

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { MessageCircle, Maximize2, Gamepad2, X as XIcon } from 'lucide-react';
 import { useBuddy } from '../hooks/useBuddy.ts';
 import { BuddySprite } from '../components/BuddySprite.tsx';
 import { DragonBuddy } from '../components/DragonBuddy.tsx';
@@ -531,6 +532,9 @@ export function Garden({ onNavigate }: Props) {
           100% { opacity: 1; transform: scale(1) translateY(0); }
         }
         @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
       `}</style>
 
       {/* ── Fundo (sky) ── */}
@@ -671,7 +675,7 @@ export function Garden({ onNavigate }: Props) {
             display: 'flex',
             flexDirection: 'column',
             gap: 6,
-            animation: 'menuPop 0.15s ease-out',
+            animation: 'popIn 0.15s ease-out',
           }}
         >
           <button
@@ -682,21 +686,21 @@ export function Garden({ onNavigate }: Props) {
               setTimeout(() => inputRef.current?.focus(), 80);
             }}
           >
-            <span style={{ fontSize: 14 }}>💬</span>
+            <MessageCircle size={14} />
             <span style={clickMenuLabel}>conversa rápida</span>
           </button>
           <button
             style={clickMenuBtn('#1a1a3a', '#6a4aaa')}
             onClick={() => { setClickMenu(false); void handleFullscreen(); }}
           >
-            <span style={{ fontSize: 14 }}>⛶</span>
+            <Maximize2 size={14} />
             <span style={clickMenuLabel}>chat completo</span>
           </button>
           <button
             style={clickMenuBtn('#2a1a1a', '#aa4a4a')}
             onClick={() => { setClickMenu(false); onNavigate('play'); }}
           >
-            <span style={{ fontSize: 14 }}>🎮</span>
+            <Gamepad2 size={14} />
             <span style={clickMenuLabel}>play!</span>
           </button>
           {/* overlay para fechar clicando fora */}
@@ -798,14 +802,14 @@ export function Garden({ onNavigate }: Props) {
               style={modalSendBtn(isStreaming || !chatInput.trim())}
             >▶</button>
           </form>
-          <button onClick={() => setChatOpen(false)} style={{ ...iconBtn, color: '#ff6666', border: '1px solid #333' }}>✕</button>
+          <button onClick={() => setChatOpen(false)} style={{ ...iconBtn, color: '#ff6666', border: '1px solid #333' }}><XIcon size={14} /></button>
         </div>
       )}
 
       {/* ── Chat Modal (modal mode) ── */}
       {gardenChatMode === 'modal' && chatOpen && bones && (
         <div style={modalBackdrop} onClick={e => { if (e.target === e.currentTarget) setChatOpen(false); }}>
-          <div style={modalPanel}>
+          <div style={{ ...modalPanel, animation: 'fadeIn 0.15s ease-out' }}>
 
             {/* Modal header */}
             <div style={modalHeader}>
@@ -830,7 +834,7 @@ export function Garden({ onNavigate }: Props) {
                   onClick={() => { void handleFullscreen(); }}
                   style={{ ...iconBtn, fontSize: '11px' }}
                   title={tl('gardenChatFullscreen')}
-                >⛶</button>
+                ><Maximize2 size={14} /></button>
                 {/* Ícone salvar — aparece se já recusou salvar antes e há mensagens */}
                 {quickchatDeclined && visibleMessages.length > 0 && !conversationId && (
                   <button
@@ -848,7 +852,7 @@ export function Garden({ onNavigate }: Props) {
                     }
                   }}
                   style={{ ...iconBtn, color: '#ff6666' }}
-                >✕</button>
+                ><XIcon size={14} /></button>
               </div>
             </div>
 

@@ -3,6 +3,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Sprout } from 'lucide-react';
 import { useBuddy } from '../hooks/useBuddy.ts';
 import { DragonBuddy, type DragonAnim } from '../components/DragonBuddy.tsx';
 import { BuddySprite } from '../components/BuddySprite.tsx';
@@ -364,7 +365,7 @@ export function PlayMode({ onNavigate }: Props) {
 
       {/* HUD */}
       <div style={hudStyle}>
-        <button onClick={() => onNavigate('garden')} style={backBtn} title="jardim">🌱</button>
+        <button onClick={() => onNavigate('garden')} style={backBtn} title="jardim"><Sprout size={16} /></button>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
           <span style={pixelText(9)}>{petName}</span>
           {bones && <RarityBadge rarity={bones.rarity} />}
@@ -505,6 +506,9 @@ export function PlayMode({ onNavigate }: Props) {
           60%  { transform: translateX(-50%) scale(1.2); }
           100% { opacity: 1; transform: translateX(-50%) scale(1); }
         }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
       `}</style>
     </div>
   );
