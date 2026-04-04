@@ -107,8 +107,8 @@ function AppShell({ page, setPage }: { page: Page; setPage: (p: Page) => void })
                         border: `1px solid ${lang === l ? '#6a6aee' : '#2a2a40'}`,
                         color: lang === l ? '#aabbff' : '#666',
                         cursor: 'pointer',
-                        fontFamily: '"Press Start 2P", monospace',
-                        fontSize: 8,
+                        fontFamily: 'inherit',
+                        fontSize: 12,
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                         transition: 'all 0.15s',
                       }}
@@ -224,8 +224,8 @@ const settingsSection: React.CSSProperties = {
 };
 
 const settingsSectionLabel: React.CSSProperties = {
-  fontFamily: '"Press Start 2P", monospace',
-  fontSize: 7,
+  fontFamily: 'inherit',
+  fontSize: 10,
   color: '#444',
   textTransform: 'uppercase',
   letterSpacing: '0.08em',

@@ -563,6 +563,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const setChatFont = useCallback((f: string) => {
     setChatFontState(f);
+    document.documentElement.style.setProperty('--app-font', f);
     try { localStorage.setItem('buddyChatFont', f); } catch { /* ignore */ }
   }, []);
 
