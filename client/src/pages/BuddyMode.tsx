@@ -22,6 +22,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Send, Maximize2 } from 'lucide-react';
+import { useBreakpoint } from '../hooks/useBreakpoint.ts';
 import { useBuddy } from '../hooks/useBuddy.ts';
 import { useSharedChat } from '../context/ChatContext.tsx';
 import { DragonBuddy, type DragonAnim } from '../components/DragonBuddy.tsx';
@@ -45,6 +46,7 @@ interface Props {
 export function BuddyMode({ onNavigate }: Props) {
   const { data } = useBuddy();
   const tl = useT();
+  const { isMobile } = useBreakpoint();
   const {
     messages, send, isStreaming, lang,
     isAnonymous, newConversation, conversationId,
@@ -274,7 +276,7 @@ export function BuddyMode({ onNavigate }: Props) {
           <div style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             {isDragon && bones ? (
               <DragonBuddy
-                size={hasMessages ? 220 : 400}
+                size={isMobile ? (hasMessages ? 130 : 220) : (hasMessages ? 220 : 400)}
                 mood={mood}
                 isMoving={petState === 'roaming'}
                 forceAnim={forceAnim}
@@ -284,7 +286,7 @@ export function BuddyMode({ onNavigate }: Props) {
               <BuddySprite
                 bones={bones}
                 frame={frame}
-                size={hasMessages ? 180 : 320}
+                size={isMobile ? (hasMessages ? 110 : 200) : (hasMessages ? 180 : 320)}
                 expression={petState === 'sleeping' ? 'sleepy' : petState === 'reacting' ? 'excited' : 'happy'}
               />
             ) : null}

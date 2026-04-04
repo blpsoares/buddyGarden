@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Sprout } from 'lucide-react';
+import { useBreakpoint } from '../hooks/useBreakpoint.ts';
 import { useBuddy } from '../hooks/useBuddy.ts';
 import { DragonBuddy, type DragonAnim } from '../components/DragonBuddy.tsx';
 import { BuddySprite } from '../components/BuddySprite.tsx';
@@ -160,6 +161,7 @@ interface Props {
 export function PlayMode({ onNavigate }: Props) {
   const { data } = useBuddy();
   const tl = useT();
+  const { isMobile } = useBreakpoint();
   const [playState, setPlayState] = useState<PlayState>('idle');
   const [hearts, setHearts] = useState<Heart[]>([]);
   const [speechBubble, setSpeechBubble] = useState('');
@@ -448,7 +450,7 @@ export function PlayMode({ onNavigate }: Props) {
         >
           {isDragon && bones ? (
             <DragonBuddy
-              size={300}
+              size={isMobile ? 180 : 300}
               mood={playState === 'petting' || playState === 'trick_done' ? 'excited' : 'happy'}
               isMoving={isActuallyMoving}
               forceAnim={forceAnim}
@@ -457,7 +459,7 @@ export function PlayMode({ onNavigate }: Props) {
             <BuddySprite
               bones={bones}
               frame={frame}
-              size={240}
+              size={isMobile ? 160 : 240}
               expression={playState === 'petting' || playState === 'trick_done' ? 'excited' : 'happy'}
             />
           ) : null}
@@ -465,18 +467,18 @@ export function PlayMode({ onNavigate }: Props) {
 
         {/* Botões de ação */}
         {(playState === 'idle' || playState === 'petting') && (
-          <div style={actionsStyle}>
-            <button onClick={handlePet} style={actionBtn('#4a6e4a', '#7aaa7a')}>
-              <span style={{ fontSize: 20 }}>🤚</span>
-              <span style={pixelText(7)}>{tl('playPet')}</span>
+          <div style={{ ...actionsStyle, gap: isMobile ? 8 : 12 }}>
+            <button onClick={handlePet} style={actionBtn('#4a6e4a', '#7aaa7a', isMobile)}>
+              <span style={{ fontSize: isMobile ? 28 : 20 }}>🤚</span>
+              <span style={pixelText(isMobile ? 6 : 7)}>{tl('playPet')}</span>
             </button>
-            <button onClick={handleFetch} style={actionBtn('#6e4a2a', '#aa8a5a')}>
-              <span style={{ fontSize: 20 }}>🦴</span>
-              <span style={pixelText(7)}>{tl('playFetch')}</span>
+            <button onClick={handleFetch} style={actionBtn('#6e4a2a', '#aa8a5a', isMobile)}>
+              <span style={{ fontSize: isMobile ? 28 : 20 }}>🦴</span>
+              <span style={pixelText(isMobile ? 6 : 7)}>{tl('playFetch')}</span>
             </button>
-            <button onClick={handleTrick} style={actionBtn('#4a2a6e', '#8a5aaa')}>
-              <span style={{ fontSize: 20 }}>🎪</span>
-              <span style={pixelText(7)}>{tl('playTrick')}</span>
+            <button onClick={handleTrick} style={actionBtn('#4a2a6e', '#8a5aaa', isMobile)}>
+              <span style={{ fontSize: isMobile ? 28 : 20 }}>🎪</span>
+              <span style={pixelText(isMobile ? 6 : 7)}>{tl('playTrick')}</span>
             </button>
           </div>
         )}
@@ -568,10 +570,11 @@ const speechBubbleStyle: React.CSSProperties = {
   background: 'rgba(14,14,40,0.95)',
   border: '1px solid rgba(80,80,200,0.5)',
   padding: '10px 16px',
-  maxWidth: 260, textAlign: 'center',
+  maxWidth: 'min(260px, 80vw)', textAlign: 'center',
   boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
   zIndex: 20,
   animation: 'fadeIn 0.2s ease',
+  width: 'max-content',
 };
 
 const bubbleTailStyle: React.CSSProperties = {
@@ -589,11 +592,13 @@ const actionsStyle: React.CSSProperties = {
   display: 'flex', gap: 12, zIndex: 20,
 };
 
-function actionBtn(bg: string, border: string): React.CSSProperties {
+function actionBtn(bg: string, border: string, isMobile = false): React.CSSProperties {
   return {
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', gap: 6,
-    padding: '12px 18px',
+    padding: isMobile ? '14px 20px' : '12px 18px',
+    minWidth: isMobile ? 80 : 'auto',
+    minHeight: isMobile ? 80 : 'auto',
     background: `${bg}cc`,
     border: `2px solid ${border}`,
     cursor: 'pointer',

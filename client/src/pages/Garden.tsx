@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { MessageCircle, Maximize2, Gamepad2, X as XIcon } from 'lucide-react';
+import { useBreakpoint } from '../hooks/useBreakpoint.ts';
 import { useBuddy } from '../hooks/useBuddy.ts';
 import { BuddySprite } from '../components/BuddySprite.tsx';
 import { DragonBuddy } from '../components/DragonBuddy.tsx';
@@ -7,6 +8,9 @@ import { RarityBadge } from '../components/RarityBadge.tsx';
 import { DragonNightBackground } from '../backgrounds/DragonBackground.tsx';
 import { useSharedChat } from '../context/ChatContext.tsx';
 import { useT } from '../hooks/useT.ts';
+import { MarkdownRenderer } from '../components/MarkdownRenderer.tsx';
+import { PermissionDialog, CommandOutput } from '../components/PermissionDialog.tsx';
+import { PixelLoader } from '../components/PixelLoader.tsx';
 import type { Page } from '../App.tsx';
 
 type Mood = 'happy' | 'excited' | 'tired' | 'bored' | 'focused' | 'chaotic';
@@ -306,6 +310,7 @@ export function Garden({ onNavigate }: Props) {
   const { data, loading } = useBuddy();
   const {
     messages, send, isStreaming, conversationId, newConversation, persistQuickChat, lang,
+    provider, approveCommand, denyCommand,
   } = useSharedChat();
   const tl = useT();
 
@@ -485,28 +490,25 @@ export function Garden({ onNavigate }: Props) {
   }, [chatInput, isStreaming, send]);
 
   const handleFullscreen = useCallback(async () => {
-    // If messages exist but no conversationId, create one before navigating
-    if (messages.filter(m => !m.hidden).length > 0 && !conversationId) {
-      const firstUser = messages.find(m => m.role === 'user' && !m.hidden);
-      if (firstUser) {
-        try {
-          await fetch('/api/conversations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ firstMessage: firstUser.content }),
-          });
-        } catch { /* continue anyway */ }
-      }
+    const visibleCount = messages.filter(m => !m.hidden).length;
+    if (visibleCount > 0 && !conversationId) {
+      // Salva a conversa anônima e marca como não-anônima antes de navegar
+      await persistQuickChat();
+    } else if (visibleCount === 0) {
+      // Sem mensagens: garante que o Chat abre em modo salvo (não anônimo)
+      newConversation(false);
     }
     onNavigate('chat');
-  }, [messages, conversationId, onNavigate]);
+  }, [messages, conversationId, onNavigate, persistQuickChat, newConversation]);
 
   // Precisa ficar antes dos early returns para não violar Rules of Hooks
   const isMoving = !isSleeping && !isHovered && !isNaturallyResting && Math.hypot(targetPos.x - pos.x, targetPos.y - pos.y) > 5;
   const moveDir = targetPos.x - pos.x; // positivo = direita, negativo = esquerda
   const visibleMessages = messages.filter(m => !m.hidden);
 
-  if (loading) return <div style={centerStyle}><p style={pixelFont}>{tl('loading')}</p></div>;
+  const { isMobile } = useBreakpoint();
+
+  if (loading) return <PixelLoader fullScreen text="LOADING" size="lg" />;
   if (!data.bones && !data.soul) return <NoBuddy />;
 
   const { bones, soul } = data;
@@ -585,17 +587,17 @@ export function Garden({ onNavigate }: Props) {
       </div>
 
       {/* ── HUD bottom ── */}
-      <div style={hudBot}>
-        <span style={{ ...pixelFont, fontSize: '8px' }}>{MOOD_EMOJI[mood]} {mood}</span>
-        <span style={{ ...pixelFont, fontSize: '8px', marginLeft: 12, color: '#999' }}>
+      <div style={{ ...hudBot, padding: isMobile ? '6px 14px' : '5px 12px' }}>
+        <span style={{ ...pixelFont, fontSize: isMobile ? '9px' : '8px' }}>{MOOD_EMOJI[mood]} {mood}</span>
+        <span style={{ ...pixelFont, fontSize: isMobile ? '9px' : '8px', marginLeft: 12, color: '#999' }}>
           {data.level} · {data.xp.toLocaleString()} xp
         </span>
-        <button onClick={() => onNavigate('buddy')} style={iconBtn} title={tl('buddyModeBtn')}>🐾</button>
-        <button onClick={() => onNavigate('stats')} style={iconBtn} title={tl('statsBtn')}>📊</button>
-        <button onClick={() => onNavigate('chat')} style={iconBtn} title={tl('chatBtn')}>💬</button>
+        <button onClick={() => onNavigate('buddy')} style={{ ...iconBtn, padding: isMobile ? '8px 10px' : '0 3px', fontSize: isMobile ? '18px' : '14px' }} title={tl('buddyModeBtn')}>🐾</button>
+        <button onClick={() => onNavigate('stats')} style={{ ...iconBtn, padding: isMobile ? '8px 10px' : '0 3px', fontSize: isMobile ? '18px' : '14px' }} title={tl('statsBtn')}>📊</button>
+        <button onClick={() => onNavigate('chat')} style={{ ...iconBtn, padding: isMobile ? '8px 10px' : '0 3px', fontSize: isMobile ? '18px' : '14px' }} title={tl('chatBtn')}>💬</button>
         <button
           onClick={() => setGardenChatMode(m => m === 'balloon' ? 'modal' : 'balloon')}
-          style={{ ...iconBtn, fontSize: '11px', color: gardenChatMode === 'balloon' ? '#aaf' : '#666' }}
+          style={{ ...iconBtn, fontSize: isMobile ? '16px' : '11px', color: gardenChatMode === 'balloon' ? '#aaf' : '#666', padding: isMobile ? '8px 10px' : '0 3px' }}
           title={tl('gardenChatMode')}
         >
           {gardenChatMode === 'balloon' ? '💬' : '🗨'}
@@ -642,10 +644,13 @@ export function Garden({ onNavigate }: Props) {
             onClick={handlePetClick}
             onMouseEnter={() => { markInteraction(); setIsHovered(true); }}
             onMouseLeave={() => { lastClickTime.current = Date.now(); setIsHovered(false); }}
+            onTouchStart={() => { markInteraction(); }}
+            onTouchEnd={(e) => { e.preventDefault(); handlePetClick(); }}
             style={{
               cursor: 'pointer',
               transform: happy ? 'scale(1.25) rotate(-6deg)' : 'scale(1)',
               transition: 'transform 0.15s',
+              padding: isMobile ? 8 : 0,
             }}
           >
             {displayBones.species === 'dragon' ? (
@@ -848,6 +853,7 @@ export function Garden({ onNavigate }: Props) {
                     if (visibleMessages.length > 0 && !conversationId) {
                       setShowCloseConfirm(true);
                     } else {
+                      newConversation(false);
                       setChatOpen(false);
                     }
                   }}
@@ -889,23 +895,41 @@ export function Garden({ onNavigate }: Props) {
                       }
                     </div>
                   )}
-                  <div style={{
-                    maxWidth: '72%',
-                    padding: '9px 12px',
-                    background: msg.role === 'user'
-                      ? 'rgba(55,55,140,0.92)'
-                      : 'rgba(18,18,45,0.92)',
-                    border: `1px solid ${msg.role === 'user' ? 'rgba(100,100,220,0.5)' : 'rgba(60,60,100,0.4)'}`,
-                    color: '#eee',
-                    fontFamily: 'inherit',
-                    fontSize: '13px',
-                    lineHeight: 1.55,
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-                  }}>
-                    {msg.content}
-                    {msg.streaming && <span style={{ marginLeft: 4, animation: 'blink 1s infinite' }}>▌</span>}
+                  <div style={{ maxWidth: '72%', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{
+                      padding: '9px 12px',
+                      background: msg.role === 'user'
+                        ? 'rgba(55,55,140,0.92)'
+                        : 'rgba(18,18,45,0.92)',
+                      border: `1px solid ${msg.role === 'user' ? 'rgba(100,100,220,0.5)' : 'rgba(60,60,100,0.4)'}`,
+                      color: '#eee',
+                      fontFamily: 'inherit',
+                      fontSize: '13px',
+                      lineHeight: 1.55,
+                      wordBreak: 'break-word',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                    }}>
+                      <MarkdownRenderer content={msg.content} streaming={msg.streaming} style={{ fontSize: 13, fontFamily: 'inherit' }} />
+                    </div>
+                    {msg.role === 'assistant' && msg.pendingCommand && provider === 'claude-cli' && (
+                      <>
+                        {msg.pendingCommand.status === 'pending' && (
+                          <PermissionDialog
+                            petName={soul?.name ?? bones?.species ?? 'buddy'}
+                            command={msg.pendingCommand.command}
+                            onAllow={() => { void approveCommand(i, false); }}
+                            onDeny={() => denyCommand(i)}
+                            onAlwaysAllow={() => { void approveCommand(i, true); }}
+                          />
+                        )}
+                        {(msg.pendingCommand.status === 'allowed' || msg.pendingCommand.status === 'done') && (
+                          <CommandOutput output={msg.pendingCommand.output ?? ''} exitCode={msg.pendingCommand.exitCode} />
+                        )}
+                        {msg.pendingCommand.status === 'denied' && (
+                          <CommandOutput output="" denied />
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -993,7 +1017,7 @@ export function Garden({ onNavigate }: Props) {
                   color: '#666', cursor: 'pointer', padding: '8px 18px',
                 }}
               >
-                não, descartar
+                não
               </button>
             </div>
           </div>
@@ -1094,8 +1118,9 @@ const modalBackdrop: React.CSSProperties = {
 };
 
 const modalPanel: React.CSSProperties = {
-  width: 'min(540px, 92%)',
-  height: '78%',
+  width: 'min(540px, 94%)',
+  height: 'min(78%, 560px)',
+  maxHeight: '88dvh',
   background: 'rgba(8,8,26,0.97)',
   border: '2px solid rgba(80,80,180,0.5)',
   display: 'flex', flexDirection: 'column',

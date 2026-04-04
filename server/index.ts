@@ -9,6 +9,7 @@ import { generateBones, readSoul, readUserId, detectSpeciesFromPersonality } fro
 import { readChatConfig } from './chat.ts';
 import { computeSessionStats } from './sessions.ts';
 import { streamChat } from './chat.ts';
+import { listClaudeSessions, getClaudeSessionMessages } from './claude-sessions.ts';
 import {
   listConversations,
   getConversation,
@@ -16,10 +17,12 @@ import {
   createConversation,
   appendMessages,
   deleteConversation,
+  deleteConversations,
   renameConversation,
   setConversationProjectDirs,
   getConversationProjectDirs,
   exportConversationToFile,
+  importFromClaude,
 } from './conversations.ts';
 
 const PORT = 7892;
@@ -163,6 +166,14 @@ Bun.serve({
       return json(createConversation(body.firstMessage.trim(), body.projectDirs));
     }
 
+    if (url.pathname === '/api/conversations' && req.method === 'DELETE') {
+      type BulkDeleteBody = { ids: string[] };
+      const body = (await req.json()) as BulkDeleteBody;
+      if (!Array.isArray(body.ids)) return json({ error: 'ids must be array' }, 400);
+      deleteConversations(body.ids);
+      return json({ ok: true, deleted: body.ids.length });
+    }
+
     const convMatch = url.pathname.match(/^\/api\/conversations\/([^/]+)$/);
     if (convMatch) {
       const id = convMatch[1]!;
@@ -196,13 +207,37 @@ Bun.serve({
       return json({ ok: true });
     }
 
-    // Fork conversation to Claude Code as a real resumable session
-    const convExportMatch = url.pathname.match(/^\/api\/conversations\/([^/]+)\/export-to-claude$/);
-    if (convExportMatch && req.method === 'POST') {
-      const id = convExportMatch[1]!;
-      const result = await exportConversationToFile(id);
-      if (!result) return json({ error: 'conversa não encontrada ou vazia' }, 404);
-      return json(result);
+    // Fork/move conversation entre Buddy e Claude
+    const convForkMatch = url.pathname.match(/^\/api\/conversations\/([^/]+)\/fork$/);
+    if (convForkMatch && req.method === 'POST') {
+      const id = convForkMatch[1]!;
+      type ForkBody = { direction: 'to-claude' | 'to-buddy'; keepSource?: boolean };
+      const body = (await req.json()) as ForkBody;
+      const keepSource = body.keepSource ?? false;
+
+      if (body.direction === 'to-claude') {
+        const result = exportConversationToFile(id, keepSource);
+        if (!result) return json({ error: 'conversa não encontrada ou vazia' }, 404);
+        return json(result);
+      } else {
+        const ok = importFromClaude(id, keepSource);
+        if (!ok) return json({ error: 'sessão Claude não encontrada' }, 404);
+        const meta = getConversationMeta(id);
+        return json({ ok: true, meta });
+      }
+    }
+
+    // ── Sessões do Claude Code ───────────────────────────────────────────────────
+    if (url.pathname === '/api/claude-sessions' && req.method === 'GET') {
+      return json(listClaudeSessions());
+    }
+
+    const claudeSessionMatch = url.pathname.match(/^\/api\/claude-sessions\/([^/]+)\/([^/]+)$/);
+    if (claudeSessionMatch && req.method === 'GET') {
+      const [, projectHash, sessionId] = claudeSessionMatch;
+      const messages = getClaudeSessionMessages(projectHash!, sessionId!);
+      if (messages.length === 0) return json({ error: 'sessão não encontrada' }, 404);
+      return json({ messages });
     }
 
     // ── Project context ──────────────────────────────────────────────────────────

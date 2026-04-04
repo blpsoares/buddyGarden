@@ -9,8 +9,7 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:7892',
       '/ws': { target: 'ws://localhost:7892', ws: true },
-    },
-    allowedHosts: true
+    }
   },
   build: {
     outDir: '../client/dist',

@@ -8,15 +8,28 @@ import { PlayMode } from './pages/PlayMode.tsx';
 import { ChatProvider, useSharedChat } from './context/ChatContext.tsx';
 import { CHAT_FONTS } from './pages/Chat.tsx';
 import { t } from './i18n.ts';
+import { useBreakpoint } from './hooks/useBreakpoint.ts';
 
 export type Page = 'garden' | 'chat' | 'stats' | 'buddy' | 'play';
 
+const VALID_PAGES: Page[] = ['garden', 'chat', 'stats', 'buddy', 'play'];
+
+function getInitialPage(): Page {
+  const saved = localStorage.getItem('buddy-page') as Page | null;
+  return saved && VALID_PAGES.includes(saved) ? saved : 'garden';
+}
+
 export default function App() {
-  const [page, setPage] = useState<Page>('garden');
+  const [page, setPage] = useState<Page>(getInitialPage);
+
+  const handleSetPage = (p: Page) => {
+    localStorage.setItem('buddy-page', p);
+    setPage(p);
+  };
 
   return (
     <ChatProvider>
-      <AppShell page={page} setPage={setPage} />
+      <AppShell page={page} setPage={handleSetPage} />
     </ChatProvider>
   );
 }
@@ -26,6 +39,7 @@ function AppShell({ page, setPage }: { page: Page; setPage: (p: Page) => void })
   const tl = (key: Parameters<typeof t>[1]) => t(lang, key);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
+  const { isMobile } = useBreakpoint();
 
   // Aplica a fonte globalmente via CSS variable
   useEffect(() => {
@@ -44,28 +58,29 @@ function AppShell({ page, setPage }: { page: Page; setPage: (p: Page) => void })
     return () => document.removeEventListener('mousedown', handleClick);
   }, [settingsOpen]);
 
+  const iconSize = isMobile ? 18 : 13;
   const NAV_PAGES: Array<{ key: Page; icon: React.ReactNode; label: string }> = [
-    { key: 'garden', icon: <Sprout size={13} />,      label: tl('navGarden') },
-    { key: 'buddy',  icon: <Footprints size={13} />,    label: tl('navBuddy') },
-    { key: 'play',   icon: <Gamepad2 size={13} />,     label: tl('navPlay') },
-    { key: 'chat',   icon: <MessageSquare size={13} />, label: tl('navChat') },
-    { key: 'stats',  icon: <BarChart2 size={13} />,    label: tl('navStats') },
+    { key: 'garden', icon: <Sprout size={iconSize} />,      label: tl('navGarden') },
+    { key: 'buddy',  icon: <Footprints size={iconSize} />,  label: tl('navBuddy') },
+    { key: 'play',   icon: <Gamepad2 size={iconSize} />,    label: tl('navPlay') },
+    { key: 'chat',   icon: <MessageSquare size={iconSize} />, label: tl('navChat') },
+    { key: 'stats',  icon: <BarChart2 size={iconSize} />,   label: tl('navStats') },
   ];
 
   return (
-    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <nav style={navStyle}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <nav style={{ ...navStyle, padding: isMobile ? '0' : '5px 8px', minHeight: isMobile ? 52 : 'auto' }}>
         {/* Botões de página */}
         {NAV_PAGES.map(({ key, icon, label }) => (
           <button
             key={key}
-            style={btnStyle(page === key)}
+            style={btnStyle(page === key, isMobile)}
             onClick={() => setPage(key)}
             title={label}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 5, flexDirection: isMobile ? 'column' : 'row' }}>
               {icon}
-              <span style={{ fontFamily: '"Press Start 2P", monospace', fontSize: 9 }}>{label}</span>
+              {!isMobile && <span style={{ fontFamily: 'inherit', fontSize: 13 }}>{label}</span>}
             </span>
           </button>
         ))}
@@ -79,7 +94,9 @@ function AppShell({ page, setPage }: { page: Page; setPage: (p: Page) => void })
               ...navIconBtn,
               color: settingsOpen ? '#aabbff' : '#888',
               display: 'flex', alignItems: 'center', gap: 5,
-              padding: '6px 10px',
+              padding: isMobile ? '14px 14px' : '6px 10px',
+              minWidth: isMobile ? 52 : 'auto',
+              minHeight: isMobile ? 52 : 'auto',
               background: settingsOpen ? 'rgba(80,80,200,0.15)' : 'transparent',
               border: settingsOpen ? '1px solid rgba(80,80,200,0.4)' : '1px solid #2a2a40',
               transition: 'all 0.15s',
@@ -87,11 +104,11 @@ function AppShell({ page, setPage }: { page: Page; setPage: (p: Page) => void })
             title="Settings"
             onClick={() => setSettingsOpen(o => !o)}
           >
-            <Settings size={15} strokeWidth={1.5} />
+            <Settings size={isMobile ? 20 : 15} strokeWidth={1.5} />
           </button>
 
           {settingsOpen && (
-            <div style={settingsDropdown}>
+            <div style={{ ...settingsDropdown, right: 0, minWidth: isMobile ? 'min(260px, 90vw)' : 210 }}>
               {/* Lang toggle */}
               <div style={settingsSection}>
                 <div style={settingsSectionLabel}>{tl('chatLangToggle')}</div>
@@ -179,11 +196,15 @@ const navStyle: React.CSSProperties = {
   flexShrink: 0,
 };
 
-function btnStyle(active: boolean): React.CSSProperties {
+function btnStyle(active: boolean, isMobile = false): React.CSSProperties {
   return {
     display: 'flex',
     alignItems: 'center',
-    padding: '7px 12px',
+    justifyContent: 'center',
+    padding: isMobile ? '0' : '7px 12px',
+    minWidth: isMobile ? 52 : 'auto',
+    minHeight: isMobile ? 52 : 'auto',
+    flex: isMobile ? '1' : undefined,
     background: active ? '#2a2a5a' : 'transparent',
     color: active ? '#aabbff' : '#666',
     border: 'none',
@@ -191,7 +212,8 @@ function btnStyle(active: boolean): React.CSSProperties {
     cursor: 'pointer',
     transition: 'all 0.15s',
     gap: 5,
-    flexShrink: 0,
+    flexShrink: isMobile ? undefined : 0,
+    fontFamily: 'var(--app-font)',
   };
 }
 
@@ -202,6 +224,7 @@ const navIconBtn: React.CSSProperties = {
   cursor: 'pointer',
   padding: '6px 10px',
   fontSize: '14px',
+  fontFamily: 'var(--app-font)',
 };
 
 const settingsDropdown: React.CSSProperties = {

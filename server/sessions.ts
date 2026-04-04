@@ -37,7 +37,7 @@ const TIERS: Array<{ name: LevelTier; minXp: number }> = [
   { name: 'Ancient',   minXp: 100_000_000 },
 ];
 
-function getLevel(xp: number): { tier: LevelTier; progress: number; current: number; next: number } {
+export function getLevel(xp: number): { tier: LevelTier; progress: number; current: number; next: number } {
   let tierIdx = 0;
   for (let i = TIERS.length - 1; i >= 0; i--) {
     if (xp >= (TIERS[i]?.minXp ?? 0)) {
@@ -208,7 +208,7 @@ function scanBuddyConversations(): {
 }
 
 // --- Compute streak ---
-function computeStreak(dates: Set<string>): number {
+export function computeStreak(dates: Set<string>): number {
   const today = new Date();
   let streak = 0;
   for (let i = 0; i < 365; i++) {
@@ -225,7 +225,7 @@ function computeStreak(dates: Set<string>): number {
 }
 
 // --- Build last7Days array ---
-function buildLast7Days(sessionDates: Map<string, string>): number[] {
+export function buildLast7Days(sessionDates: Map<string, string>): number[] {
   const last7: number[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();

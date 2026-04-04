@@ -100,9 +100,100 @@ export function appendMessages(id: string, messages: ConversationMessage[]) {
 }
 
 export function deleteConversation(id: string) {
+  const index = readIndex();
+  const meta = index.find(m => m.id === id);
+
   const filePath = join(CONV_DIR, `${id}.jsonl`);
   if (existsSync(filePath)) unlinkSync(filePath);
-  writeIndex(readIndex().filter(m => m.id !== id));
+
+  // Se foi exportado para Claude, apaga também o arquivo de sessão do Claude
+  if (meta?.forkedSessionId && meta?.forkedProjectDir) {
+    const projectHash = meta.forkedProjectDir.replace(/[/.]/g, '-');
+    const claudeFile = join(homedir(), '.claude', 'projects', projectHash, `${meta.forkedSessionId}.jsonl`);
+    if (existsSync(claudeFile)) unlinkSync(claudeFile);
+  }
+
+  writeIndex(index.filter(m => m.id !== id));
+}
+
+export function deleteConversations(ids: string[]) {
+  if (ids.length === 0) return;
+  const idSet = new Set(ids);
+  const index = readIndex();
+
+  for (const id of ids) {
+    const meta = index.find(m => m.id === id);
+
+    const filePath = join(CONV_DIR, `${id}.jsonl`);
+    if (existsSync(filePath)) unlinkSync(filePath);
+
+    if (meta?.forkedSessionId && meta?.forkedProjectDir) {
+      const projectHash = meta.forkedProjectDir.replace(/[/.]/g, '-');
+      const claudeFile = join(homedir(), '.claude', 'projects', projectHash, `${meta.forkedSessionId}.jsonl`);
+      if (existsSync(claudeFile)) unlinkSync(claudeFile);
+    }
+  }
+
+  writeIndex(index.filter(m => !idSet.has(m.id)));
+}
+
+/** Deleta apenas a entrada Buddy (index + JSONL), sem tocar no arquivo Claude. */
+export function deleteBuddyEntry(id: string) {
+  const index = readIndex();
+  const filePath = join(CONV_DIR, `${id}.jsonl`);
+  if (existsSync(filePath)) unlinkSync(filePath);
+  writeIndex(index.filter(m => m.id !== id));
+}
+
+/** Importa mensagens da sessão Claude de volta para o Buddy.
+ *  keepSource=false → deleta o arquivo Claude e limpa forkedSessionId
+ *  keepSource=true  → mantém o arquivo Claude e o forkedSessionId
+ */
+export function importFromClaude(id: string, keepSource: boolean): boolean {
+  const meta = getConversationMeta(id);
+  if (!meta?.forkedSessionId || !meta?.forkedProjectDir) return false;
+
+  const projectHash = meta.forkedProjectDir.replace(/[/.]/g, '-');
+  const claudeFile = join(homedir(), '.claude', 'projects', projectHash, `${meta.forkedSessionId}.jsonl`);
+  if (!existsSync(claudeFile)) return false;
+
+  const lines = readFileSync(claudeFile, 'utf-8').split('\n').filter(Boolean);
+  const messages: ConversationMessage[] = [];
+  for (const line of lines) {
+    try {
+      const entry = JSON.parse(line) as {
+        type: string;
+        message: { role: string; content: string | Array<{ type: string; text: string }> };
+        timestamp: string;
+      };
+      if (entry.type !== 'user' && entry.type !== 'assistant') continue;
+      const rawContent = entry.message.content;
+      const content = typeof rawContent === 'string'
+        ? rawContent
+        : (rawContent as Array<{ type: string; text: string }>)
+            .filter(c => c.type === 'text')
+            .map(c => c.text)
+            .join('');
+      messages.push({ role: entry.message.role as 'user' | 'assistant', content, ts: new Date(entry.timestamp).getTime() });
+    } catch { /* pula linha malformada */ }
+  }
+
+  if (messages.length === 0) return false;
+
+  const filePath = join(CONV_DIR, `${id}.jsonl`);
+  writeFileSync(filePath, messages.map(m => JSON.stringify(m)).join('\n') + '\n');
+
+  const index = readIndex();
+  const m = index.find(x => x.id === id);
+  if (m) {
+    m.updatedAt = Date.now();
+    m.messageCount = messages.length;
+    if (!keepSource) { delete m.forkedSessionId; delete m.forkedProjectDir; }
+    writeIndex(index);
+  }
+
+  if (!keepSource && existsSync(claudeFile)) unlinkSync(claudeFile);
+  return true;
 }
 
 export function renameConversation(id: string, title: string) {
@@ -126,38 +217,12 @@ export function setConversationProjectDirs(id: string, dirs: string[]) {
   writeIndex(index);
 }
 
-// ── Auto-open terminal (WSL2 / Linux) ────────────────────────────────────────
-
-async function openInTerminal(sessionId: string, cwd: string): Promise<boolean> {
-  const safeDir = cwd.replace(/'/g, "'\\''");
-  const cmd = `cd '${safeDir}' && claude --resume ${sessionId}`;
-
-  // Tentativa 1: x-terminal-emulator (Linux desktop)
-  try {
-    Bun.spawn(
-      ['x-terminal-emulator', '-e', `bash -c "${cmd.replace(/"/g, '\\"')}"`],
-      { stdout: 'pipe', stderr: 'pipe', stdin: null },
-    );
-    return true;
-  } catch { /* ignora */ }
-
-  // Tentativa 2: gnome-terminal
-  try {
-    Bun.spawn(
-      ['gnome-terminal', '--', 'bash', '-c', `${cmd}; exec bash`],
-      { stdout: 'pipe', stderr: 'pipe', stdin: null },
-    );
-    return true;
-  } catch { /* ignora */ }
-
-  return false;
-}
-
 // ── Fork para Claude Code ─────────────────────────────────────────────────────
 
-export async function exportConversationToFile(
+export function exportConversationToFile(
   id: string,
-): Promise<{ path: string; command: string; sessionId: string; opened: boolean } | null> {
+  keepSource = false,
+): { path: string; command: string; sessionId: string } | null {
   const messages = getConversation(id);
   if (messages.length === 0) return null;
 
@@ -204,24 +269,21 @@ export async function exportConversationToFile(
 
   writeFileSync(sessionFile, lines.join('\n') + '\n');
 
-  // Salva forkedSessionId na meta da conversa
-  if (meta) {
-    const index = readIndex();
-    const m = index.find(x => x.id === id);
-    if (m) {
-      m.forkedSessionId = sessionId;
-      m.forkedProjectDir = cwd;
-      writeIndex(index);
+  if (keepSource) {
+    // Copia — mantém Buddy, salva forkedSessionId na meta
+    if (meta) {
+      const index = readIndex();
+      const m = index.find(x => x.id === id);
+      if (m) { m.forkedSessionId = sessionId; m.forkedProjectDir = cwd; writeIndex(index); }
     }
+  } else {
+    // Move — deleta apenas a entrada Buddy, sessão Claude fica intacta
+    deleteBuddyEntry(id);
   }
-
-  // Tenta abrir terminal automaticamente
-  const opened = await openInTerminal(sessionId, cwd);
 
   return {
     path: cwd,
     sessionId,
     command: `claude --resume ${sessionId}`,
-    opened,
   };
 }

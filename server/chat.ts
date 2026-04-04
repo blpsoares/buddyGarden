@@ -40,7 +40,7 @@ export function readChatConfig(): ChatConfig {
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
-function buildSystemPrompt(
+export function buildSystemPrompt(
   soul: Soul | null,
   bones: BuddyBones,
   stats: SessionStats,
@@ -96,6 +96,7 @@ async function streamViaAnthropic(
   history: Array<{ role: 'user' | 'assistant'; content: string }>,
   system: string,
   apiKey: string,
+  model: ClaudeModel,
   onChunk: (text: string) => void,
   onDone: () => void,
   onError: (err: string) => void,
@@ -107,11 +108,19 @@ async function streamViaAnthropic(
     { role: 'user', content: message },
   ];
 
+  // Prompt caching: o system prompt fica cacheado por 5min na Anthropic.
+  // A partir da 2ª mensagem da conversa, os tokens do system não são recontados.
+  const systemWithCache: Anthropic.TextBlockParam[] = [{
+    type: 'text',
+    text: system,
+    cache_control: { type: 'ephemeral' },
+  }];
+
   try {
     const stream = client.messages.stream({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
-      system,
+      model,
+      max_tokens: 1024,
+      system: systemWithCache,
       messages,
     });
 
@@ -178,21 +187,22 @@ async function streamViaCLI(
 ): Promise<void> {
   const cleanHistory = history.filter(h => h.content.trim().length > 0);
 
-  let prompt = `${system}\n\n---\n\n`;
+  // Histórico recente formatado como contexto de conversa (sem system prompt)
+  let historyContext = '';
   for (const h of cleanHistory.slice(-6)) {
-    prompt += `${h.role === 'user' ? 'Usuário' : 'Você'}: ${h.content}\n\n`;
+    historyContext += `${h.role === 'user' ? 'Usuário' : 'Você'}: ${h.content}\n\n`;
   }
-  prompt += `Usuário: ${message}\n\nVocê:`;
+  const prompt = historyContext ? `${historyContext}Usuário: ${message}` : message;
 
   try {
     const tmpDir = join(homedir(), '.buddy-garden', 'tmp');
     if (!existsSync(tmpDir)) { const { mkdirSync } = await import('fs'); mkdirSync(tmpDir, { recursive: true }); }
 
-    // --output-format stream-json --verbose: emite eventos JSON incrementais
-    // com o texto acumulado crescendo a cada token batch gerado pelo modelo.
+    // --system-prompt: system prompt como flag separado (não embutido no corpo)
+    // evita que o CLI ecoe o system prompt de volta na resposta.
     const cwd = (projectDir && existsSync(projectDir)) ? projectDir : tmpDir;
     const proc = Bun.spawn(
-      ['claude', '--print', '--output-format', 'stream-json', '--verbose', '--model', model],
+      ['claude', '--print', '--output-format', 'stream-json', '--verbose', '--model', model, '--system-prompt', system],
       { stdout: 'pipe', stderr: 'pipe', stdin: 'pipe', cwd },
     );
     proc.stdin.write(prompt);
@@ -255,10 +265,10 @@ async function streamViaCLI(
 // de resumo compacto inserido como primeira mensagem de "user" no histórico.
 // Isso garante que o modelo sempre vê o contexto recente completo.
 
-const HISTORY_TOKEN_LIMIT = 3000; // tokens estimados do histórico antes de comprimir
-const KEEP_TAIL = 10;             // últimas N mensagens sempre preservadas
+const HISTORY_TOKEN_LIMIT = 1200; // tokens estimados do histórico antes de comprimir (~4800 chars)
+const KEEP_TAIL = 6;              // últimas N mensagens sempre preservadas (3 trocas)
 
-function compressHistory(
+export function compressHistory(
   history: Array<{ role: 'user' | 'assistant'; content: string }>,
 ): Array<{ role: 'user' | 'assistant'; content: string }> {
   const estimatedTokens = history.reduce((acc, m) => acc + Math.ceil(m.content.length / 4), 0);
@@ -269,9 +279,9 @@ function compressHistory(
 
   // Resumo compacto das mensagens antigas (uma linha por turno)
   const summaryLines = head.map(m => {
-    const who = m.role === 'user' ? 'Usuário' : 'Pet';
-    const snip = m.content.slice(0, 120).replace(/\n/g, ' ');
-    return `${who}: ${snip}${m.content.length > 120 ? '…' : ''}`;
+    const who = m.role === 'user' ? 'U' : 'P';
+    const snip = m.content.slice(0, 60).replace(/\n/g, ' ');
+    return `${who}: ${snip}${m.content.length > 60 ? '…' : ''}`;
   });
 
   const summaryMsg = {
@@ -304,7 +314,7 @@ export async function streamChat(
   switch (config.provider) {
     case 'anthropic':
       if (!config.apiKey) { onError('API_KEY_MISSING'); return; }
-      await streamViaAnthropic(message, history, system, config.apiKey, onChunk, onDone, onError);
+      await streamViaAnthropic(message, history, system, config.apiKey, config.claudeModel ?? 'claude-haiku-4-5', onChunk, onDone, onError);
       break;
 
     case 'gemini':
