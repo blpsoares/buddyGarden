@@ -67,7 +67,7 @@ export function Chat() {
     conversationId, isAnonymous, conversations,
     loadConversation, newConversation, removeConversation, setIsAnonymous,
     addConvProjectDir, removeConvProjectDir, activeConvMeta, activeConvProjectDirs,
-    lang, setLang,
+    lang, setLang, chatFont, setChatFont,
   } = useChat();
   const tl = useT();
   const { data } = useBuddy();
@@ -76,6 +76,7 @@ export function Chat() {
   const [frame, setFrame] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [fontPickerOpen, setFontPickerOpen] = useState(false);
 
   // Fecha dropdown ao clicar fora
   useEffect(() => {
@@ -403,6 +404,43 @@ export function Chat() {
             >
               {lang === 'pt' ? '🇧🇷' : '🇺🇸'}
             </button>
+            {/* Font picker */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setFontPickerOpen(o => !o)}
+                style={{ ...iconBtnStyle, fontSize: 13, color: fontPickerOpen ? '#aabbff' : '#888', padding: '5px 8px' }}
+                title="Trocar fonte"
+              >
+                Aa
+              </button>
+              {fontPickerOpen && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setFontPickerOpen(false)} />
+                  <div style={fontDropdownStyle}>
+                    {CHAT_FONTS.map(f => (
+                      <button
+                        key={f.value}
+                        onClick={() => { setChatFont(f.value); setFontPickerOpen(false); }}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left',
+                          padding: '8px 14px',
+                          background: chatFont === f.value ? 'rgba(80,80,200,0.2)' : 'transparent',
+                          border: 'none',
+                          borderLeft: chatFont === f.value ? '2px solid #6a6aee' : '2px solid transparent',
+                          color: chatFont === f.value ? '#aabbff' : '#ccc',
+                          cursor: 'pointer',
+                          fontFamily: f.value,
+                          fontSize: f.previewSize ?? 13,
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
             <button
               onClick={() => setShowSetup(s => !s)}
               style={{ ...iconBtnStyle, color: showSetup ? '#aabbff' : '#aaa', fontSize: 16 }}
@@ -590,9 +628,9 @@ export function Chat() {
               <div style={{ maxWidth: '75%', display: 'flex', flexDirection: 'column' }}>
                 <div style={msgBubbleStyle(msg.role === 'user')}>
                   {msg.role === 'assistant' ? (
-                    <MarkdownRenderer content={msg.content} streaming={msg.streaming} style={{ fontSize: 15 }} />
+                    <MarkdownRenderer content={msg.content} streaming={msg.streaming} style={{ fontSize: 15, fontFamily: chatFont }} />
                   ) : (
-                    <span style={{ fontFamily: 'sans-serif', fontSize: 15, color: '#eee', lineHeight: 1.55 }}>
+                    <span style={{ fontFamily: chatFont, fontSize: 15, color: '#eee', lineHeight: 1.55 }}>
                       {msg.content}
                     </span>
                   )}
@@ -769,10 +807,10 @@ const containerStyle: React.CSSProperties = {
 
 const headerStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center',
-  padding: '8px 12px',
+  padding: '10px 14px',
   background: '#0d0d1e',
   borderBottom: '1px solid #1a1a30',
-  gap: 4,
+  gap: 6,
 };
 
 const projectBadgeStyle: React.CSSProperties = {
@@ -845,7 +883,7 @@ const messagesStyle: React.CSSProperties = {
 };
 
 const msgBubbleStyle = (isUser: boolean): React.CSSProperties => ({
-  padding: '11px 15px',
+  padding: '13px 17px',
   background: isUser ? '#252560' : '#16162e',
   border: `1px solid ${isUser ? '#3a3a88' : '#252540'}`,
   boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
@@ -859,7 +897,7 @@ const formStyle: React.CSSProperties = {
 };
 
 const inputStyle: React.CSSProperties = {
-  flex: 1, padding: '9px 13px',
+  flex: 1, padding: '11px 15px',
   background: '#141430',
   border: '1px solid #2a2a50',
   color: '#eee',
@@ -869,13 +907,13 @@ const inputStyle: React.CSSProperties = {
 };
 
 const sendBtnStyle = (disabled: boolean): React.CSSProperties => ({
-  padding: '9px 18px',
+  padding: '11px 20px',
   background: disabled ? '#1a1a30' : '#3a5acc',
   border: `1px solid ${disabled ? '#252535' : '#5a7aee'}`,
   color: disabled ? '#444' : '#fff',
   cursor: disabled ? 'not-allowed' : 'pointer',
   fontFamily: '"Press Start 2P", monospace',
-  fontSize: '12px',
+  fontSize: '13px',
   boxShadow: disabled ? 'none' : '0 2px 8px rgba(58,90,204,0.3)',
 });
 
@@ -884,8 +922,8 @@ const iconBtnStyle: React.CSSProperties = {
   border: '1px solid #1e1e35',
   color: '#888',
   cursor: 'pointer',
-  padding: '5px 8px',
-  fontSize: '14px',
+  padding: '6px 10px',
+  fontSize: '16px',
   borderRadius: 2,
 };
 
@@ -924,3 +962,28 @@ function SidebarToggleIcon(_: { open: boolean }) {
     </svg>
   );
 }
+
+// ── Font picker ───────────────────────────────────────────────────────────────
+
+export const CHAT_FONTS: { label: string; value: string; previewSize?: number }[] = [
+  { label: 'Press Start 2P',  value: '"Press Start 2P", monospace', previewSize: 10 },
+  { label: 'Silkscreen',      value: '"Silkscreen", monospace',      previewSize: 13 },
+  { label: 'VT323',           value: '"VT323", monospace',           previewSize: 18 },
+  { label: 'Pixelify Sans',   value: '"Pixelify Sans", sans-serif',  previewSize: 14 },
+  { label: 'Sans-serif',      value: 'sans-serif',                   previewSize: 14 },
+  { label: 'Monospace',       value: 'monospace',                    previewSize: 13 },
+];
+
+const fontDropdownStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 'calc(100% + 6px)',
+  right: 0,
+  zIndex: 50,
+  background: 'rgba(8,8,24,0.98)',
+  border: '1px solid rgba(80,80,180,0.4)',
+  minWidth: 180,
+  boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+};

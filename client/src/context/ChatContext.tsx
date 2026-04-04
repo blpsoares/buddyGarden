@@ -79,6 +79,11 @@ interface ChatContextValue {
   // i18n
   lang: 'pt' | 'en';
   setLang: (l: 'pt' | 'en') => void;
+  // Font picker
+  chatFont: string;
+  setChatFont: (f: string) => void;
+  // Persiste conversa anônima do quick chat no servidor
+  persistQuickChat: () => Promise<string | null>;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -95,6 +100,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [conversations, setConversations] = useState<ConversationMeta[]>([]);
   const [lang, setLangState] = useState<'pt' | 'en'>('pt');
+  const [chatFont, setChatFontState] = useState<string>(() => {
+    try { return localStorage.getItem('buddyChatFont') ?? 'sans-serif'; } catch { return 'sans-serif'; }
+  });
   // Pastas de contexto pendentes (antes de criar a conversa com 1ª mensagem)
   const [pendingProjectDirs, setPendingProjectDirs] = useState<string[]>([]);
 
@@ -553,6 +561,39 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setConversationId(null);
   }, []);
 
+  const setChatFont = useCallback((f: string) => {
+    setChatFontState(f);
+    try { localStorage.setItem('buddyChatFont', f); } catch { /* ignore */ }
+  }, []);
+
+  /** Persiste a conversa anônima atual no servidor. Retorna o novo conversationId ou null. */
+  const persistQuickChat = useCallback(async (): Promise<string | null> => {
+    const visibleMsgs = messagesRef.current.filter(m => !m.hidden && m.content.trim());
+    const firstUser = visibleMsgs.find(m => m.role === 'user');
+    if (!firstUser || conversationIdRef.current) return conversationIdRef.current;
+    try {
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firstMessage: firstUser.content }),
+      });
+      if (!res.ok) return null;
+      const meta = await res.json() as ConversationMeta;
+      // Appende todas as mensagens visíveis
+      await fetch(`/api/conversations/${meta.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: visibleMsgs.map(m => ({ role: m.role, content: m.content })) }),
+      });
+      setConversationId(meta.id);
+      conversationIdRef.current = meta.id;
+      setIsAnonymous(false);
+      isAnonymousRef.current = false;
+      setConversations(prev => [meta, ...prev]);
+      return meta.id;
+    } catch { return null; }
+  }, []);
+
   const activeConvMeta = conversationId
     ? (conversations.find(c => c.id === conversationId) ?? null)
     : null;
@@ -570,6 +611,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setIsAnonymous, refreshConversations,
       addConvProjectDir, removeConvProjectDir, activeConvMeta, activeConvProjectDirs,
       lang, setLang,
+      chatFont, setChatFont, persistQuickChat,
     }}>
       {children}
     </ChatContext.Provider>

@@ -304,7 +304,7 @@ const ALL_SPECIES = ['duck','goose','cat','rabbit','owl','penguin','turtle','sna
 export function Garden({ onNavigate }: Props) {
   const { data, loading } = useBuddy();
   const {
-    messages, send, isStreaming, conversationId, newConversation, isAnonymous,
+    messages, send, isStreaming, conversationId, newConversation, persistQuickChat,
   } = useSharedChat();
   const tl = useT();
 
@@ -336,32 +336,27 @@ export function Garden({ onNavigate }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastClickTime = useRef(0);
 
-  // Save prompt state (shown after 3rd user message when no conversationId yet)
-  const [showSavePrompt, setShowSavePrompt] = useState(false);
-  const userMsgCountRef = useRef(0);
+  // Quick chat save flow
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [savingQuickChat, setSavingQuickChat] = useState(false);
+  // Persiste entre navegações dentro da sessão (resetado ao recarregar a página)
+  const [quickchatDeclined, setQuickchatDeclined] = useState(() => {
+    try { return sessionStorage.getItem('quickchat_declined') === '1'; } catch { return false; }
+  });
 
   // Persist gardenChatMode
   useEffect(() => {
     try { localStorage.setItem('gardenChatMode', gardenChatMode); } catch { /* ignore */ }
   }, [gardenChatMode]);
 
-  // Start a new conversation when chat opens and messages are empty
+  // Quick chat sempre abre como anônimo (não auto-salva)
   const prevChatOpen = useRef(false);
   useEffect(() => {
     if (chatOpen && !prevChatOpen.current && messages.length === 0) {
-      newConversation(isAnonymous);
+      newConversation(true); // sempre anônimo no quick chat
     }
     prevChatOpen.current = chatOpen;
-  }, [chatOpen, messages.length, newConversation, isAnonymous]);
-
-  // Track user messages to show save prompt
-  useEffect(() => {
-    const userCount = messages.filter(m => m.role === 'user' && !m.hidden).length;
-    if (userCount > 0 && userCount !== userMsgCountRef.current) {
-      userMsgCountRef.current = userCount;
-      if (userCount === 3 && !conversationId) setShowSavePrompt(true);
-    }
-  }, [messages, conversationId]);
+  }, [chatOpen, messages.length, newConversation]);
 
   // WebSocket mood
   useEffect(() => {
@@ -836,28 +831,28 @@ export function Garden({ onNavigate }: Props) {
                   style={{ ...iconBtn, fontSize: '11px' }}
                   title={tl('gardenChatFullscreen')}
                 >⛶</button>
-                <button onClick={() => setChatOpen(false)} style={{ ...iconBtn, color: '#ff6666' }}>✕</button>
+                {/* Ícone salvar — aparece se já recusou salvar antes e há mensagens */}
+                {quickchatDeclined && visibleMessages.length > 0 && !conversationId && (
+                  <button
+                    onClick={() => setShowCloseConfirm(true)}
+                    style={{ ...iconBtn, fontSize: '13px', color: '#aaa' }}
+                    title="Salvar conversa"
+                  >💾</button>
+                )}
+                <button
+                  onClick={() => {
+                    if (visibleMessages.length > 0 && !conversationId) {
+                      setShowCloseConfirm(true);
+                    } else {
+                      setChatOpen(false);
+                    }
+                  }}
+                  style={{ ...iconBtn, color: '#ff6666' }}
+                >✕</button>
               </div>
             </div>
 
-            {/* Prompt de salvar conversa */}
-            {showSavePrompt && !conversationId && (
-              <div style={{ padding: '6px 12px', background: 'rgba(20,20,60,0.95)', borderBottom: '1px solid rgba(80,80,180,0.3)', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
-                <span style={{ fontFamily: 'sans-serif', fontSize: '11px', color: '#aaa' }}>
-                  {tl('gardenChatSavePrompt')}
-                </span>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    onClick={() => { newConversation(false); setShowSavePrompt(false); }}
-                    style={{ fontFamily: 'sans-serif', fontSize: '11px', background: '#2a2a7a', border: '1px solid #4a4aaa', color: '#aabbff', cursor: 'pointer', padding: '2px 10px' }}
-                  >{tl('gardenChatSaveYes')}</button>
-                  <button
-                    onClick={() => setShowSavePrompt(false)}
-                    style={{ fontFamily: 'sans-serif', fontSize: '11px', background: 'transparent', border: '1px solid #333', color: '#666', cursor: 'pointer', padding: '2px 10px' }}
-                  >{tl('gardenChatSaveNo')}</button>
-                </div>
-              </div>
-            )}
+            {/* Badge: conversa já salva */}
             {conversationId && (
               <div style={{ padding: '4px 12px', background: 'rgba(10,30,10,0.95)', borderBottom: '1px solid rgba(40,120,40,0.3)', fontFamily: 'sans-serif', fontSize: '11px', color: '#4caf50' }}>
                 {tl('gardenChatSaved')}
@@ -933,6 +928,70 @@ export function Garden({ onNavigate }: Props) {
                 ▶
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de confirmação: salvar quick chat? ── */}
+      {showCloseConfirm && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 50,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,10,0.7)',
+          backdropFilter: 'blur(4px)',
+        }}>
+          <div style={{
+            background: 'rgba(10,10,28,0.98)',
+            border: '2px solid rgba(80,80,200,0.5)',
+            padding: '24px 28px',
+            maxWidth: 320,
+            width: '88%',
+            boxShadow: '0 8px 40px rgba(0,0,40,0.8)',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>💾</div>
+            <p style={{ ...pixelFont, fontSize: '8px', marginBottom: 8 }}>salvar conversa?</p>
+            <p style={{ fontFamily: 'sans-serif', fontSize: 12, color: '#666', marginBottom: 20, lineHeight: 1.5 }}>
+              Deseja salvar esta conversa no histórico permanentemente?
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button
+                disabled={savingQuickChat}
+                onClick={async () => {
+                  setSavingQuickChat(true);
+                  await persistQuickChat();
+                  setSavingQuickChat(false);
+                  setShowCloseConfirm(false);
+                  setQuickchatDeclined(false);
+                  try { sessionStorage.removeItem('quickchat_declined'); } catch { /* ignore */ }
+                  setChatOpen(false);
+                }}
+                style={{
+                  fontFamily: 'sans-serif', fontSize: 13,
+                  background: savingQuickChat ? '#1a1a4a' : '#2a2a7a',
+                  border: '1px solid #4a4aaa', color: '#aabbff',
+                  cursor: savingQuickChat ? 'wait' : 'pointer',
+                  padding: '8px 18px',
+                }}
+              >
+                {savingQuickChat ? 'salvando...' : '✓ sim, salvar'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowCloseConfirm(false);
+                  setQuickchatDeclined(true);
+                  try { sessionStorage.setItem('quickchat_declined', '1'); } catch { /* ignore */ }
+                  setChatOpen(false);
+                }}
+                style={{
+                  fontFamily: 'sans-serif', fontSize: 13,
+                  background: 'transparent', border: '1px solid #333',
+                  color: '#666', cursor: 'pointer', padding: '8px 18px',
+                }}
+              >
+                não, descartar
+              </button>
+            </div>
           </div>
         </div>
       )}
