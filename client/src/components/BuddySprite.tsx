@@ -495,7 +495,7 @@ function drawOctopus(ctx: Ctx, pal: Pal, by: number, blink: boolean, expr: Expre
   // 6 tentacles
   const tentacleX = [2, 5, 8, 12, 15, 18];
   for (let i = 0; i < tentacleX.length; i++) {
-    const x = tentacleX[i];
+    const x = tentacleX[i]!;
     const offset = i % 2 === 0 ? 0 : 1;
     ctx.fillRect(x, 15 + by, 2, 3 + offset);
     ctx.fillRect(x + (i % 2 === 0 ? 1 : -1), 18 + offset + by, 2, 3);
@@ -507,7 +507,7 @@ function drawOctopus(ctx: Ctx, pal: Pal, by: number, blink: boolean, expr: Expre
   // outline tentacles
   ctx.fillStyle = K;
   for (let i = 0; i < tentacleX.length; i++) {
-    const x = tentacleX[i];
+    const x = tentacleX[i]!;
     ctx.fillRect(x - 1, 15 + by, 1, 5);
     ctx.fillRect(x + 2, 15 + by, 1, 5);
   }
@@ -630,7 +630,7 @@ function drawRobot(ctx: Ctx, pal: Pal, by: number, blink: boolean, expr: Express
   ov(ctx, 9, 0 + by, 5, 3, a, K);
   // head (boxy — rect not oval)
   rf(ctx, 4, 3 + by, 16, 11, K);
-  rf(ctx, 5, 4 + by, 14, 9, p, K);
+  rf(ctx, 5, 4 + by, 14, 9, p);
   // visor dark band
   rf(ctx, 5, 6 + by, 14, 4, b);
   ctx.fillStyle = K;
@@ -767,9 +767,9 @@ function drawMushroom(ctx: Ctx, pal: Pal, by: number, blink: boolean, expr: Expr
   drawMouth(ctx, 12, 20 + by, expr, K);
   // tiny legs/feet
   ov(ctx, 7, 21 + by, 4, 3, K, K);
-  ov(ctx, 7, 21 + by, 3, 2, d);
+  ov(ctx, 7, 21 + by, 3, 2, d, K);
   ov(ctx, 13, 21 + by, 4, 3, K, K);
-  ov(ctx, 14, 21 + by, 3, 2, d);
+  ov(ctx, 14, 21 + by, 3, 2, d, K);
 }
 
 function drawChonk(ctx: Ctx, pal: Pal, by: number, blink: boolean, expr: Expression) {
@@ -974,14 +974,14 @@ function applyShimmer(ctx: Ctx, frame: number) {
     'rgba(255, 255, 200, 0.35)',
   ];
   ctx.globalCompositeOperation = 'screen';
-  ctx.fillStyle = shimmerColors[frame % shimmerColors.length];
+  ctx.fillStyle = shimmerColors[frame % shimmerColors.length]!;
   ctx.fillRect(0, 0, 24, 24);
   ctx.globalCompositeOperation = 'source-over';
   // sparkles
   ctx.fillStyle = '#FFFFFF';
-  const sparkPositions = [[3, 3], [20, 5], [5, 18], [19, 20], [12, 2]];
+  const sparkPositions: [number, number][] = [[3, 3], [20, 5], [5, 18], [19, 20], [12, 2]];
   const sparkIdx = frame % sparkPositions.length;
-  const [sx, sy] = sparkPositions[sparkIdx];
+  const [sx, sy] = sparkPositions[sparkIdx]!;
   ctx.fillRect(sx, sy, 1, 1);
   ctx.fillRect(sx + 1, sy - 1, 1, 1);
   ctx.fillRect(sx - 1, sy + 1, 1, 1);
@@ -1040,7 +1040,7 @@ export function BuddySprite({
     ctx.clearRect(0, 0, 24, 24);
 
     const { species, isShiny, hat } = bones;
-    const pal = PALS[species] ?? PALS['blob'];
+    const pal = (PALS[species] ?? PALS['blob'])!;
 
     // frame semantics: 0=neutral, 1=bob up, 2=bob down + blink
     const bobY = frame === 1 ? -1 : frame === 2 ? 1 : 0;
