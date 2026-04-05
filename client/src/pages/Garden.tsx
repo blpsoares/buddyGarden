@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { MessageCircle, Maximize2, Gamepad2, X as XIcon } from 'lucide-react';
 import { useBreakpoint } from '../hooks/useBreakpoint.ts';
 import { useBuddy } from '../hooks/useBuddy.ts';
-import { BuddySprite } from '../components/BuddySprite.tsx';
-import { DragonBuddy } from '../components/DragonBuddy.tsx';
+import { AtlasBuddy } from '../components/AtlasBuddy.tsx';
 import { RarityBadge } from '../components/RarityBadge.tsx';
 import { DragonNightBackground } from '../backgrounds/DragonBackground.tsx';
 import { useSharedChat } from '../context/ChatContext.tsx';
@@ -653,18 +652,17 @@ export function Garden({ onNavigate }: Props) {
               padding: isMobile ? 8 : 0,
             }}
           >
-            {displayBones.species === 'dragon' ? (
-              <DragonBuddy
-                size={200}
-                mood={mood}
-                isMoving={isMoving}
-                moveDir={moveDir}
-                forceAnim={specialPlaying ? 'special' : isSleeping ? 'sleep' : isHovered ? 'idle' : undefined}
-                onAnimEnd={handleSpecialEnd}
-              />
-            ) : (
-              <BuddySprite bones={displayBones} frame={frame} size={128} expression={happy ? 'excited' : mood === 'tired' ? 'sleepy' : mood} />
-            )}
+            <AtlasBuddy
+              bones={displayBones}
+              size={200}
+              mood={mood}
+              isMoving={isMoving}
+              moveDir={moveDir}
+              forceAnim={specialPlaying ? 'special' : isSleeping ? 'sleep' : isHovered ? 'idle' : undefined}
+              onAnimEnd={handleSpecialEnd}
+              frame={frame}
+              expression={happy ? 'excited' : mood === 'tired' ? 'sleepy' : mood}
+            />
           </div>
         </div>
       )}
@@ -742,10 +740,7 @@ export function Garden({ onNavigate }: Props) {
               }}>
                 {!isUser && bones && (
                   <div style={{ flexShrink: 0 }}>
-                    {displayBones?.species === 'dragon'
-                      ? <DragonBuddy size={28} mood={mood} isMoving={false} />
-                      : <BuddySprite bones={displayBones ?? bones} frame={0} size={28} />
-                    }
+                    <AtlasBuddy bones={displayBones ?? bones} size={28} mood={mood} frame={0} />
                   </div>
                 )}
                 <div
@@ -819,10 +814,7 @@ export function Garden({ onNavigate }: Props) {
             {/* Modal header */}
             <div style={modalHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {displayBones?.species === 'dragon'
-                  ? <DragonBuddy size={52} mood={mood} isMoving={false} />
-                  : <BuddySprite bones={displayBones ?? bones} frame={frame} size={52} />
-                }
+                <AtlasBuddy bones={displayBones ?? bones} size={52} mood={mood} frame={frame} />
                 <div>
                   <span style={{ ...pixelFont, fontSize: '9px', color: '#ddd' }}>
                     {soul?.name ?? bones.species}
@@ -889,10 +881,7 @@ export function Garden({ onNavigate }: Props) {
                 >
                   {msg.role === 'assistant' && (
                     <div style={{ flexShrink: 0 }}>
-                      {displayBones?.species === 'dragon'
-                        ? <DragonBuddy size={40} mood={mood} isMoving={false} />
-                        : <BuddySprite bones={displayBones ?? bones} frame={0} size={40} />
-                      }
+                      <AtlasBuddy bones={displayBones ?? bones} size={40} mood={mood} frame={0} />
                     </div>
                   )}
                   <div style={{ maxWidth: '72%', display: 'flex', flexDirection: 'column' }}>

@@ -9,6 +9,7 @@ import { ChatProvider, useSharedChat } from './context/ChatContext.tsx';
 import { CHAT_FONTS } from './pages/Chat.tsx';
 import { t } from './i18n.ts';
 import { useBreakpoint } from './hooks/useBreakpoint.ts';
+import { useSessions } from './hooks/useSessions.ts';
 
 export type Page = 'garden' | 'chat' | 'stats' | 'buddy' | 'play';
 
@@ -35,6 +36,10 @@ export default function App() {
 }
 
 function AppShell({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
+  // Kick off sessions fetch immediately at app load so Stats shows data
+  // instantly when the user navigates there, regardless of which page they land on.
+  useSessions();
+
   const { lang, setLang, chatFont, setChatFont } = useSharedChat();
   const tl = (key: Parameters<typeof t>[1]) => t(lang, key);
   const [settingsOpen, setSettingsOpen] = useState(false);

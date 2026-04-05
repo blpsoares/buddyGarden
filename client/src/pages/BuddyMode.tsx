@@ -25,8 +25,7 @@ import { ArrowLeft, Send, Maximize2 } from 'lucide-react';
 import { useBreakpoint } from '../hooks/useBreakpoint.ts';
 import { useBuddy } from '../hooks/useBuddy.ts';
 import { useSharedChat } from '../context/ChatContext.tsx';
-import { DragonBuddy, type DragonAnim } from '../components/DragonBuddy.tsx';
-import { BuddySprite } from '../components/BuddySprite.tsx';
+import { AtlasBuddy, type AtlasAnim } from '../components/AtlasBuddy.tsx';
 import { DragonNightBackground } from '../backgrounds/DragonBackground.tsx';
 import { RarityBadge } from '../components/RarityBadge.tsx';
 import { MarkdownRenderer } from '../components/MarkdownRenderer.tsx';
@@ -164,10 +163,9 @@ export function BuddyMode({ onNavigate }: Props) {
   }
 
   const { bones, soul } = data;
-  const isDragon = bones?.species === 'dragon';
   const petName = soul?.name ?? bones?.species ?? 'Buddy';
 
-  const forceAnim: DragonAnim =
+  const forceAnim: AtlasAnim =
     petState === 'sleeping'  ? 'sleep'   :
     petState === 'roaming'   ? 'walk'    :
     petState === 'reacting'  ? 'special' :
@@ -178,7 +176,7 @@ export function BuddyMode({ onNavigate }: Props) {
   return (
     <div style={containerStyle}>
       {/* Background */}
-      {isDragon ? (
+      {bones?.species === 'dragon' ? (
         <DragonNightBackground />
       ) : (
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,#04001a 0%,#14004a 55%,#1a0048 100%)' }} />
@@ -219,13 +217,10 @@ export function BuddyMode({ onNavigate }: Props) {
                 >
                   {msg.role === 'assistant' && (
                     <div style={avatarStyle}>
-                      {isDragon && bones ? (
-                        <DragonBuddy size={28} mood={mood} forceAnim="idle" />
-                      ) : bones ? (
-                        <BuddySprite bones={bones} frame={frame} size={28} expression="happy" />
-                      ) : (
-                        <span style={{ fontSize: 18 }}>🐾</span>
-                      )}
+                      {bones
+                        ? <AtlasBuddy bones={bones} size={28} frame={frame} expression="happy" forceAnim="idle" />
+                        : <span style={{ fontSize: 18 }}>🐾</span>
+                      }
                     </div>
                   )}
                   <div
@@ -274,22 +269,18 @@ export function BuddyMode({ onNavigate }: Props) {
           onClick={handlePetClick}
         >
           <div style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            {isDragon && bones ? (
-              <DragonBuddy
+            {bones && (
+              <AtlasBuddy
+                bones={bones}
                 size={isMobile ? (hasMessages ? 130 : 220) : (hasMessages ? 220 : 400)}
                 mood={mood}
                 isMoving={petState === 'roaming'}
                 forceAnim={forceAnim}
                 onAnimEnd={handleAnimEnd}
-              />
-            ) : bones ? (
-              <BuddySprite
-                bones={bones}
                 frame={frame}
-                size={isMobile ? (hasMessages ? 110 : 200) : (hasMessages ? 180 : 320)}
                 expression={petState === 'sleeping' ? 'sleepy' : petState === 'reacting' ? 'excited' : 'happy'}
               />
-            ) : null}
+            )}
 
             {petState === 'sleeping' && (
               <div style={{ textAlign: 'center', marginTop: 6 }}>

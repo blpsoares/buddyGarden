@@ -4,8 +4,7 @@ import { useBreakpoint } from '../hooks/useBreakpoint.ts';
 import { useChat } from '../hooks/useChat.ts';
 import type { ClaudeSessionMeta } from '../context/ChatContext.tsx';
 import { useBuddy } from '../hooks/useBuddy.ts';
-import { BuddySprite } from '../components/BuddySprite.tsx';
-import { DragonBuddy } from '../components/DragonBuddy.tsx';
+import { AtlasBuddy } from '../components/AtlasBuddy.tsx';
 import { MarkdownRenderer } from '../components/MarkdownRenderer.tsx';
 import { PermissionDialog, CommandOutput } from '../components/PermissionDialog.tsx';
 import { PixelLoader } from '../components/PixelLoader.tsx';
@@ -298,7 +297,6 @@ export function Chat() {
   }, [removeConversation, refreshConversations, refreshClaudeSessions, conversationId, loadConversation]);
 
   const petName = data.soul?.name ?? data.bones?.species ?? 'Buddy';
-  const isDragon = data.bones?.species === 'dragon';
   const bothActive = showBuddySessions && showClaudeSessions;
   const sourceLabel = !bothActive && (showBuddySessions || showClaudeSessions)
     ? (showClaudeSessions ? 'Claude' : 'Buddy')
@@ -902,12 +900,7 @@ export function Chat() {
             <SidebarToggleIcon open={sidebarOpen} />
           </button>
           <div style={{ marginLeft: '8px', flexShrink: 0 }}>
-            {isDragon
-              ? <DragonBuddy size={44} mood="happy" isMoving={false} />
-              : data.bones
-                ? <BuddySprite bones={data.bones} frame={frame} size={44} />
-                : null
-            }
+            {data.bones && <AtlasBuddy bones={data.bones} size={44} frame={frame} />}
           </div>
           <div style={{ marginLeft: '10px', flex: 1 }}>
             <span style={pixelText(11)}>{petName}</span>
@@ -1166,10 +1159,7 @@ export function Chat() {
             >
               {showOnLeft && data.bones && (
                 <div style={{ flexShrink: 0, width: 44, height: 44 }}>
-                  {isLastAssistant && (isDragon
-                    ? <DragonBuddy size={44} mood="happy" isMoving={false} />
-                    : <BuddySprite bones={data.bones} frame={frame} size={44} />
-                  )}
+                  {isLastAssistant && <AtlasBuddy bones={data.bones} size={44} frame={frame} />}
                 </div>
               )}
               <div style={{ maxWidth: '75%', display: 'flex', flexDirection: 'column' }}>

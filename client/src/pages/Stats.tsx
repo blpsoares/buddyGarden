@@ -1,27 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useBuddy, type BuddyBones } from '../hooks/useBuddy.ts';
-import { BuddySprite } from '../components/BuddySprite.tsx';
-import { DragonBuddy } from '../components/DragonBuddy.tsx';
+import { useSessions, type SessionData } from '../hooks/useSessions.ts';
+import { AtlasBuddy } from '../components/AtlasBuddy.tsx';
 import { RarityBadge } from '../components/RarityBadge.tsx';
 import { useT } from '../hooks/useT.ts';
 import { useBreakpoint } from '../hooks/useBreakpoint.ts';
 import type { TKey } from '../i18n.ts';
 
-interface SourceStats {
-  sessionsToday: number;
-  sessionsTotal: number;
-  messagesTotal: number;
-  last7Days: number[];
-}
-
-interface SessionData {
-  today: number;
-  total: number;
-  streak: number;
-  last7Days: number[];
-  claude: SourceStats;
-  buddy: SourceStats;
-}
 
 interface BuddyStats {
   debugging: number;
@@ -211,9 +196,9 @@ type StatsView = 'all' | 'claude' | 'buddy';
 
 export function Stats() {
   const { data, loading } = useBuddy();
+  const { data: sessions } = useSessions();
   const tl = useT();
   const { isMobile } = useBreakpoint();
-  const [sessions, setSessions] = useState<SessionData | null>(null);
   const [frame, setFrame] = useState(0);
   const [view, setView] = useState<StatsView>('all');
 
@@ -221,19 +206,6 @@ export function Stats() {
     const t = setInterval(() => setFrame(f => (f + 1) % 3), 400);
     return () => clearInterval(t);
   }, []);
-
-  useEffect(() => {
-    void fetchSessions();
-    const interval = setInterval(() => { void fetchSessions(); }, 10_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  async function fetchSessions() {
-    try {
-      const res = await fetch('/api/sessions');
-      if (res.ok) setSessions((await res.json()) as SessionData);
-    } catch { /* ignore */ }
-  }
 
   if (loading) return (
     <div style={centerStyle}>
@@ -248,7 +220,6 @@ export function Stats() {
   );
 
   const { bones, soul } = data;
-  const isDragon = bones?.species === 'dragon';
 
   let peakStat = '';
   let valleyStat = '';
@@ -278,10 +249,7 @@ export function Stats() {
             <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
                 <div style={{ flexShrink: 0 }}>
-                  {bones && (isDragon
-                    ? <DragonBuddy size={80} mood="happy" isMoving={false} />
-                    : <BuddySprite bones={bones} frame={frame} size={80} />
-                  )}
+                  {bones && <AtlasBuddy bones={bones} size={80} frame={frame} />}
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontFamily: '"Press Start 2P", monospace', fontSize: 13, color: '#eee', marginBottom: 6, wordBreak: 'break-word' }}>
@@ -333,10 +301,7 @@ export function Stats() {
               <div style={{ ...cardStyle, flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
                   <div style={{ flexShrink: 0 }}>
-                    {bones && (isDragon
-                      ? <DragonBuddy size={80} mood="happy" isMoving={false} />
-                      : <BuddySprite bones={bones} frame={frame} size={80} />
-                    )}
+                    {bones && <AtlasBuddy bones={bones} size={80} frame={frame} />}
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontFamily: '"Press Start 2P", monospace', fontSize: 13, color: '#eee', marginBottom: 6, wordBreak: 'break-word' }}>

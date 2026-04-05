@@ -6,8 +6,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Sprout } from 'lucide-react';
 import { useBreakpoint } from '../hooks/useBreakpoint.ts';
 import { useBuddy } from '../hooks/useBuddy.ts';
-import { DragonBuddy, type DragonAnim } from '../components/DragonBuddy.tsx';
-import { BuddySprite } from '../components/BuddySprite.tsx';
+import { AtlasBuddy, type AtlasAnim } from '../components/AtlasBuddy.tsx';
 import { DragonNightBackground } from '../backgrounds/DragonBackground.tsx';
 import { RarityBadge } from '../components/RarityBadge.tsx';
 import { useT } from '../hooks/useT.ts';
@@ -337,10 +336,9 @@ export function PlayMode({ onNavigate }: Props) {
   }
 
   const { bones, soul } = data;
-  const isDragon = bones?.species === 'dragon';
   const petName = soul?.name ?? bones?.species ?? 'Buddy';
 
-  const forceAnim: DragonAnim =
+  const forceAnim: AtlasAnim =
     playState === 'fetching' || playState === 'throw_anim'
       ? 'walkr'
       : playState === 'returning'
@@ -361,7 +359,7 @@ export function PlayMode({ onNavigate }: Props) {
 
   return (
     <div style={containerStyle}>
-      {isDragon ? <DragonNightBackground /> : (
+      {bones?.species === 'dragon' ? <DragonNightBackground /> : (
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,#04001a 0%,#14004a 55%,#1a0048 100%)' }} />
       )}
 
@@ -448,18 +446,14 @@ export function PlayMode({ onNavigate }: Props) {
           }}
           onClick={handlePet}
         >
-          {isDragon && bones ? (
-            <DragonBuddy
+          {bones ? (
+            <AtlasBuddy
+              bones={bones}
               size={isMobile ? 180 : 300}
               mood={playState === 'petting' || playState === 'trick_done' ? 'excited' : 'happy'}
               isMoving={isActuallyMoving}
               forceAnim={forceAnim}
-            />
-          ) : bones ? (
-            <BuddySprite
-              bones={bones}
               frame={frame}
-              size={isMobile ? 160 : 240}
               expression={playState === 'petting' || playState === 'trick_done' ? 'excited' : 'happy'}
             />
           ) : null}
