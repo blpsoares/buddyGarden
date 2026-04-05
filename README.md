@@ -1,10 +1,10 @@
-# buddy.land
+# buddy.garden
 
 Your Claude Code Buddy, outside the terminal.  
 Animated pixel art, interactive world, real conversation with your companion.
 
 ```bash
-bunx buddy-land
+bunx buddy-garden
 # opens at http://localhost:7892
 ```
 
@@ -14,7 +14,7 @@ bunx buddy-land
 
 Claude Code has a pet system called `/buddy`. Every user gets a unique companion generated deterministically from their `userId` — but it only lives in the terminal as ASCII art, with no rich interaction.
 
-**buddy.land** solves this: it reads your buddy's data directly from Claude Code's local files, renders the pet as animated pixel art, and lets you chat, play, and watch it evolve based on your real Claude Code usage.
+**buddy.garden** solves this: it reads your buddy's data directly from Claude Code's local files, renders the pet as animated pixel art, and lets you chat, play, and watch it evolve based on your real Claude Code usage.
 
 ---
 
@@ -96,7 +96,7 @@ Affects movement speed, facial expression, idle animation, and response tone.
 
 ```bash
 # Option 1: zero install (coming to npm)
-bunx buddy-land
+bunx buddy-garden
 
 # Option 2: clone and run
 git clone https://github.com/blpsoares/buddyGarden.git
@@ -107,7 +107,7 @@ bun run dev
 
 Opens at `http://localhost:7892` (server) + `http://localhost:5173` (Vite dev).
 
-On first launch you'll be asked for your `ANTHROPIC_API_KEY` — stored locally in `~/.buddy-land/config.json`. Nothing is sent to external servers beyond the configured AI provider.
+On first launch you'll be asked for your `ANTHROPIC_API_KEY` — stored locally in `~/.buddy-garden/config.json`. Nothing is sent to external servers beyond the configured AI provider.
 
 If you haven't run `/buddy` in Claude Code yet, the garden shows a waiting screen and automatically detects when the companion is created (polling every 5s).
 
@@ -256,10 +256,10 @@ WS   /ws/mood                            → mood event stream (every 30s)
 
 ## Local data
 
-Everything stays in `~/.buddy-land/` — never sent to external servers:
+Everything stays in `~/.buddy-garden/` — never sent to external servers:
 
 ```
-~/.buddy-land/
+~/.buddy-garden/
 ├── config.json          # provider, apiKey, claudeModel, lang, alwaysAllowed
 ├── progress.json        # { xp, lastUpdated }
 └── conversations/
